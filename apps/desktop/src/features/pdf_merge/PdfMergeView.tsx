@@ -247,7 +247,7 @@ export function PdfMergeView(): React.ReactNode {
             ))}
           </ol>
           <div style={{ marginTop: "var(--paperu-space-4)", display: "flex", gap: "var(--paperu-space-3)" }}>
-            <Button variant="outline" onClick={handlePick}>Add more</Button>
+            <Button variant="outline" onClick={handlePick} disabled={state.kind === "running"}>Add more</Button>
             <Button
               variant="accent"
               onClick={run}

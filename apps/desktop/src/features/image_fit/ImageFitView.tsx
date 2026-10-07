@@ -185,6 +185,10 @@ export function ImageFitView(): React.ReactNode {
     setTarget(null);
   }
 
+  // Hoisted outside the JSX so TypeScript does not narrow it inside the
+  // `state.kind === "ready"` block (rapid-click defense).
+  const isRunning = state.kind === "running";
+
   return (
     <section className="paperu-section" aria-labelledby="image-fit-heading">
       <header className="paperu-section__header">
@@ -266,7 +270,7 @@ export function ImageFitView(): React.ReactNode {
               onChange={setTarget}
             />
             <div style={{ padding: "var(--paperu-space-5)", paddingTop: 0 }}>
-              <Button variant="accent" onClick={run} disabled={!target} style={{ width: "100%" }}>
+              <Button variant="accent" onClick={run} disabled={!target || isRunning} style={{ width: "100%" }}>
                 Make it fit
               </Button>
             </div>
