@@ -18,7 +18,22 @@ export interface DryRunResult {
   readonly skipped: readonly string[];
   readonly errors: readonly string[];
 }
+/** A file that execute() could not move/copy, with the reason. */
+export interface ExecuteFailure {
+  readonly path: string;
+  readonly name: string;
+  readonly error: string;
+}
+/** Result of running an organizer rule for real. Source-safety: a failed
+ *  move leaves the source untouched; the batch never aborts on one file. */
+export interface ExecuteResult {
+  readonly succeeded: readonly MatchedFile[];
+  readonly failed: readonly ExecuteFailure[];
+}
 export const OrganizerCommand = {
-  Save: "save_organizer_rule", List: "list_organizer_rules",
-  Delete: "delete_organizer_rule", DryRun: "dry_run_organizer",
+  Save: "save_organizer_rule",
+  List: "list_organizer_rules",
+  Delete: "delete_organizer_rule",
+  DryRun: "dry_run_organizer",
+  Execute: "execute_organizer",
 } as const;

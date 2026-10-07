@@ -19,9 +19,12 @@ import type {
   ApplicationKitItem,
   CreateNoteFolderRequest,
   CreateNoteRequest,
+  DryRunResult,
+  ExecuteResult,
   InspectFileResponse,
   Note,
   NoteFolder,
+  OrganizerRule,
   ReadingHistoryEntry,
   RecentWorkEntry,
   Settings,
@@ -34,6 +37,7 @@ import {
   ApplicationKitCommand,
   CommandName,
   NotesCommand,
+  OrganizerCommand,
   ReadingHistoryCommand,
   RecentWorkCommand,
   isAppError,
@@ -375,6 +379,38 @@ export async function updateApplicationKitItem(
 /** Remove a single kit item by id. */
 export async function removeApplicationKitItem(id: string): Promise<void> {
   await call<null>(ApplicationKitCommand.Remove, { id });
+}
+
+// ── Folder Organizer (rules-based file automation) ────────────────
+
+/** Persist a folder-organizer rule (insert or replace by id). Returns the id. */
+export async function saveOrganizerRule(rule: OrganizerRule): Promise<string> {
+  return call<string>(OrganizerCommand.Save, { rule });
+}
+
+/** List all saved folder-organizer rules, ordered by sortOrder. */
+export async function listOrganizerRules(): Promise<OrganizerRule[]> {
+  return call<OrganizerRule[]>(OrganizerCommand.List);
+}
+
+/** Delete a saved folder-organizer rule by id. */
+export async function deleteOrganizerRule(id: string): Promise<void> {
+  await call<null>(OrganizerCommand.Delete, { id });
+}
+
+/** Preview what a rule would do. Does NOT touch the filesystem. */
+export async function dryRunOrganizer(rule: OrganizerRule): Promise<DryRunResult> {
+  return call<DryRunResult>(OrganizerCommand.DryRun, { rule });
+}
+
+/**
+ * Run an organizer rule for real. Performs the configured action
+ * (move/copy) on every matched file. Source-safety: a failed move
+ * leaves the source untouched; the batch never aborts on one file.
+ * Cross-volume moves fall back to copy+delete.
+ */
+export async function executeOrganizerRule(rule: OrganizerRule): Promise<ExecuteResult> {
+  return call<ExecuteResult>(OrganizerCommand.Execute, { rule });
 }
 
 // ── Notes ────────────────────────────────────────────────────────

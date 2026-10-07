@@ -180,6 +180,7 @@ mod runtime {
                 crate::commands::organizer::list_organizer_rules,
                 crate::commands::organizer::delete_organizer_rule,
                 crate::commands::organizer::dry_run_organizer,
+                crate::commands::organizer::execute_organizer,
                 crate::commands::file_rescue::diagnose_file,
                 crate::commands::archive_studio::validate_zip_entry,
                 crate::commands::archive_studio::check_suspicious_ratio,

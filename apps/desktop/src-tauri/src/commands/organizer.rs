@@ -1,6 +1,6 @@
 #![cfg(feature = "tauri-runtime")]
 use crate::errors::Result;
-use crate::organizer::{self, DryRunResult, OrganizerRule};
+use crate::organizer::{self, DryRunResult, ExecuteResult, OrganizerRule};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -24,4 +24,9 @@ pub fn delete_organizer_rule(state: tauri::State<'_, AppState>, id: String) -> R
 #[tauri::command]
 pub fn dry_run_organizer(rule: OrganizerRule) -> Result<DryRunResult> {
     organizer::dry_run(&rule)
+}
+
+#[tauri::command]
+pub fn execute_organizer(rule: OrganizerRule) -> Result<ExecuteResult> {
+    organizer::execute(&rule)
 }

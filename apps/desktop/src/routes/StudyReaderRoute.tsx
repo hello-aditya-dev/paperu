@@ -15,7 +15,7 @@
  * The full 300-page PDF is not pre-rendered. Memory should stay flat.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { filePath } from "@paperu/contracts";
 import { getReadingHistory, upsertReadingHistory } from "@/lib/ipc";
 import { readFileBytes } from "@/lib/file-picker";
@@ -23,6 +23,19 @@ import { readFileBytes } from "@/lib/file-picker";
 interface StudyReaderRouteProps {
   /** The file path to read. Passed via the route query string. */
   readonly path: string | null;
+}
+
+type FitMode = "manual" | "fit-width";
+
+// Zoom bounds shared by the manual +/− buttons and the fit-width calc.
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3.0;
+// Horizontal padding inside the reader viewport (both sides), so fit-width
+// doesn't crop content against the edge.
+const FIT_PADDING_PX = 32;
+
+function clampZoom(z: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 }
 
 export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNode {
@@ -33,10 +46,25 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
   const [pageNum, setPageNum] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [zoom, setZoom] = useState(1.0);
+  const [fitMode, setFitMode] = useState<FitMode>("manual");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  // Natural page width at scale 1.0 (pdfjs user-space units ≈ 1/72").
+  // Captured when a page renders so fit-width can compute a real scale.
+  const naturalWidthRef = useRef<number | null>(null);
   const upsertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Real fit-width: containerWidth / naturalPageWidth, with padding + bounds.
+  const computeFitZoom = useCallback((): number | null => {
+    const natural = naturalWidthRef.current;
+    const viewport = viewportRef.current;
+    if (!natural || !viewport || natural <= 0) return null;
+    const containerWidth = viewport.clientWidth - FIT_PADDING_PX;
+    if (containerWidth <= 0) return null;
+    return clampZoom(containerWidth / natural);
+  }, []);
 
   // Load reading history for the path; jump to last page if present.
   useEffect(() => {
@@ -83,6 +111,9 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
         setPageCount(pdf.numPages);
         const page = await pdf.getPage(pageNum);
         if (cancelled) return;
+        // Capture the natural page width at scale 1.0 so the fit-width
+        // button can compute a REAL scale instead of faking zoom=1.
+        naturalWidthRef.current = page.getViewport({ scale: 1.0 }).width;
         const viewport = page.getViewport({ scale: zoom });
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -103,6 +134,30 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
       cancelled = true;
     };
   }, [path, pageNum, zoom]);
+
+  // Recalculate fit-width zoom on viewport resize (master prompt §659).
+  // When fit-mode is "fit-width", a window resize must re-fit the page
+  // to the new container width. In manual mode, the user's zoom stays.
+  useEffect(() => {
+    if (fitMode !== "fit-width") return;
+    const onResize = () => {
+      const fit = computeFitZoom();
+      if (fit !== null) setZoom(fit);
+    };
+    window.addEventListener("resize", onResize);
+    // Recalculate once on entering fit-width mode (in case the container
+    // changed since the last fit).
+    onResize();
+    return () => window.removeEventListener("resize", onResize);
+  }, [fitMode, computeFitZoom]);
+
+  // If the path changes, reset fit-mode to manual so a new document
+  // doesn't inherit the previous fit-width state before its natural
+  // width is known.
+  useEffect(() => {
+    setFitMode("manual");
+    naturalWidthRef.current = null;
+  }, [path]);
 
   // Debounced upsert of reading position.
   // FIX (repair §20): the previous guard `if (!path || !history) return`
@@ -185,24 +240,39 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
           <button
             type="button"
             className="paperu-reader__btn"
-            onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+            onClick={() => {
+              setFitMode("manual");
+              setZoom((z) => Math.max(MIN_ZOOM, z - 0.25));
+            }}
           >
             −
           </button>
           <span className="paperu-reader__zoom-level">
-            {Math.round(zoom * 100)}%
+            {Math.round(zoom * 100)}%{fitMode === "fit-width" ? " · fit" : ""}
           </span>
           <button
             type="button"
             className="paperu-reader__btn"
-            onClick={() => setZoom((z) => Math.min(3.0, z + 0.25))}
+            onClick={() => {
+              setFitMode("manual");
+              setZoom((z) => Math.min(MAX_ZOOM, z + 0.25));
+            }}
           >
             +
           </button>
           <button
             type="button"
-            className="paperu-reader__btn"
-            onClick={() => setZoom(1.0)}
+            className={`paperu-reader__btn${fitMode === "fit-width" ? " is-active" : ""}`}
+            aria-pressed={fitMode === "fit-width"}
+            onClick={() => {
+              // TRUE fit-width (master prompt §659): compute the real scale
+              // from containerWidth / naturalPageWidth. If the natural width
+              // isn't known yet (page still rendering), mark fit-mode so the
+              // resize effect will compute it on the next render.
+              setFitMode("fit-width");
+              const fit = computeFitZoom();
+              if (fit !== null) setZoom(fit);
+            }}
           >
             Fit width
           </button>
@@ -213,7 +283,7 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
           {error}
         </div>
       )}
-      <div className="paperu-reader__viewport">
+      <div className="paperu-reader__viewport" ref={viewportRef}>
         {loading && <p className="paperu-reader__loading">Rendering page…</p>}
         <canvas ref={canvasRef} className="paperu-reader__canvas" />
       </div>

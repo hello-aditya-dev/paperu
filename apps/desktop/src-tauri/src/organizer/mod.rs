@@ -111,6 +111,113 @@ pub fn dry_run(rule: &OrganizerRule) -> Result<DryRunResult> {
     })
 }
 
+/// Result of running an organizer rule for real (execute).
+/// Each matched file is either moved/copied (succeeded) or reported
+/// with the error that stopped it (failed). The batch never aborts on a
+/// single file failure — one bad file doesn't stop the rest.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteResult {
+    pub succeeded: Vec<MatchedFile>,
+    pub failed: Vec<ExecuteFailure>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecuteFailure {
+    pub path: String,
+    pub name: String,
+    pub error: String,
+}
+
+/// Run a rule against the filesystem for real. Performs the configured
+/// action (move/copy) on every matched file. The destination folder is
+/// created if missing. Cross-volume moves fall back to copy+delete
+/// (std::fs::rename fails across filesystem boundaries on Windows).
+///
+/// Source safety (§22): the original is only removed on a successful
+/// move. A failed move leaves the source untouched. A copy never
+/// touches the source.
+pub fn execute(rule: &OrganizerRule) -> Result<ExecuteResult> {
+    let src = Path::new(&rule.source_folder);
+    if !src.is_dir() {
+        return Err(AppError::builder(
+            code::PATH_INVALID,
+            ErrorCategory::Filesystem,
+            "Source folder doesn't exist.",
+        )
+        .build());
+    }
+    let dest = Path::new(&rule.dest_folder);
+    // Create the destination folder if it's missing — a rule shouldn't
+    // fail just because the user hasn't made the target folder yet.
+    if !dest.exists() {
+        std::fs::create_dir_all(dest).map_err(|e| {
+            AppError::builder(
+                code::IO_FAILURE,
+                ErrorCategory::Filesystem,
+                "Paperu couldn't create the destination folder.",
+            )
+            .technical(e.to_string())
+            .build()
+        })?;
+    }
+
+    // Reuse the dry-run matcher to decide which files to act on.
+    let preview = dry_run(rule)?;
+    let mut succeeded = Vec::new();
+    let mut failed = Vec::new();
+
+    for file in preview.matched_files.into_iter() {
+        let from = Path::new(&file.path);
+        let to = Path::new(&file.dest_path);
+        // Skip directories — only act on files (the matcher already does
+        // this, but defend against symlinks to directories).
+        if !from.is_file() {
+            failed.push(ExecuteFailure {
+                path: file.path.clone(),
+                name: file.name.clone(),
+                error: "Not a regular file.".to_string(),
+            });
+            continue;
+        }
+        let outcome = match rule.action.as_str() {
+            "move" => move_file(from, to),
+            "copy" => std::fs::copy(from, to).map(|_| ()),
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Unknown action",
+            )),
+        };
+        match outcome {
+            Ok(()) => succeeded.push(file),
+            Err(e) => failed.push(ExecuteFailure {
+                path: file.path,
+                name: file.name,
+                error: e.to_string(),
+            }),
+        }
+    }
+    Ok(ExecuteResult { succeeded, failed })
+}
+
+/// Move a file, falling back to copy+delete across volumes. std::fs::rename
+/// is atomic on the same filesystem but fails across volume boundaries
+/// (e.g. C: → D: on Windows). The fallback preserves source-safety: the
+/// source is only removed after a successful copy.
+fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(18) => {
+            // EXDEV — crosses devices. Fall back to copy + remove.
+            std::fs::copy(from, to)?;
+            std::fs::remove_file(from)?;
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 // ── DB CRUD ─────────────────────────────────────────────────────
 
 pub fn save_rule(db: &Database, rule: &OrganizerRule) -> Result<String> {
@@ -261,5 +368,117 @@ mod tests {
         assert_eq!(list_rules(&db).unwrap().len(), 1);
         delete_rule(&db, &id).unwrap();
         assert_eq!(list_rules(&db).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn execute_moves_matched_files_and_leaves_unmatched() {
+        let tmp = std::env::temp_dir().join(format!("paperu-exec-{}", uuid::Uuid::new_v4()));
+        let src = tmp.join("src");
+        let dest = tmp.join("dest");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(src.join("a.pdf"), b"pdf-bytes").unwrap();
+        std::fs::write(src.join("b.txt"), b"txt-bytes").unwrap();
+
+        let rule = OrganizerRule {
+            id: None,
+            name: "PDFs".to_string(),
+            source_folder: src.to_string_lossy().to_string(),
+            dest_folder: dest.to_string_lossy().to_string(),
+            condition_type: "extension".to_string(),
+            condition_value: "pdf".to_string(),
+            action: "move".to_string(),
+            enabled: Some(true),
+            sort_order: None,
+        };
+        let result = execute(&rule).unwrap();
+        assert_eq!(result.succeeded.len(), 1, "one file should have moved");
+        assert_eq!(result.failed.len(), 0);
+        assert_eq!(result.succeeded[0].name, "a.pdf");
+        // Source-safety: the matched file is gone from source, in dest.
+        assert!(
+            !src.join("a.pdf").exists(),
+            "moved file must be gone from source"
+        );
+        assert!(dest.join("a.pdf").exists(), "moved file must be in dest");
+        // Unmatched file is untouched in source.
+        assert!(
+            src.join("b.txt").exists(),
+            "unmatched file must stay in source"
+        );
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn execute_creates_dest_folder_if_missing() {
+        let tmp = std::env::temp_dir().join(format!("paperu-exec-mkdir-{}", uuid::Uuid::new_v4()));
+        let src = tmp.join("src");
+        let dest = tmp.join("nested").join("dest");
+        std::fs::create_dir_all(&src).unwrap();
+        // dest deliberately NOT created.
+        std::fs::write(src.join("x.pdf"), b"x").unwrap();
+        let rule = OrganizerRule {
+            id: None,
+            name: "PDFs".to_string(),
+            source_folder: src.to_string_lossy().to_string(),
+            dest_folder: dest.to_string_lossy().to_string(),
+            condition_type: "extension".to_string(),
+            condition_value: "pdf".to_string(),
+            action: "copy".to_string(),
+            enabled: Some(true),
+            sort_order: None,
+        };
+        let result = execute(&rule).unwrap();
+        assert_eq!(result.succeeded.len(), 1);
+        assert!(dest.exists(), "execute must create the destination folder");
+        assert!(dest.join("x.pdf").exists());
+        // Copy leaves the source untouched (source-safety).
+        assert!(
+            src.join("x.pdf").exists(),
+            "copy must not remove the source"
+        );
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn execute_reports_per_file_failure_without_aborting_batch() {
+        // A same-named directory at the destination blocks the move for
+        // that one file (rename into an existing directory entry fails),
+        // while other matched files still succeed — proving the batch
+        // never aborts on a single per-file failure.
+        let tmp = std::env::temp_dir().join(format!("paperu-exec-fail-{}", uuid::Uuid::new_v4()));
+        let src = tmp.join("src");
+        let dest = tmp.join("dest");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(src.join("ok.pdf"), b"ok").unwrap();
+        std::fs::write(src.join("blocked.pdf"), b"blocked").unwrap();
+        // Make dest/blocked.pdf a directory — the move for blocked.pdf
+        // cannot overwrite a directory with a file rename.
+        std::fs::create_dir_all(dest.join("blocked.pdf")).unwrap();
+        let rule = OrganizerRule {
+            id: None,
+            name: "PDFs".to_string(),
+            source_folder: src.to_string_lossy().to_string(),
+            dest_folder: dest.to_string_lossy().to_string(),
+            condition_type: "extension".to_string(),
+            condition_value: "pdf".to_string(),
+            action: "move".to_string(),
+            enabled: Some(true),
+            sort_order: None,
+        };
+        let result = execute(&rule).unwrap();
+        assert!(
+            result.succeeded.iter().any(|f| f.name == "ok.pdf"),
+            "ok.pdf should move successfully"
+        );
+        assert!(
+            result.failed.iter().any(|f| f.name == "blocked.pdf"),
+            "blocked.pdf should be reported as failed, not crash the batch"
+        );
+        // ok.pdf is gone from source (moved); blocked.pdf stays in source.
+        assert!(!src.join("ok.pdf").exists());
+        assert!(src.join("blocked.pdf").exists());
+        std::fs::remove_dir_all(&tmp).ok();
     }
 }
