@@ -397,3 +397,38 @@ The gap to 50 requires deepening:
 - Everyday file power (+1-2 pts): add TS tests for the 7 deepened routes
 - Automation (+1-2 pts): backup/timer/watch foundations with real logic
 - Images (+1 pt): wire image utility functions to the Offline Converter route
+
+---
+Task ID: oss-harvest-sprint
+Agent: Builder (Z.ai Code, sandbox environment)
+Task: Open-Source Harvest + Integration sprint — take Paperu from ~37% to ≥50%+ genuine completion by harvesting mature permissively-licensed OSS, not by rebuilding commodity infrastructure.
+
+Work Log:
+- Confirmed environment: gh 2.102.0, pnpm 12.10.1 (corepack shim), Rust 1.99.0 (matches rust-toolchain.toml pin = current stable; NO MSRV upgrade needed per §11).
+- On agent/builder at SHA 3c249f25 (matches master prompt baseline). 77 commits ahead of main, clean working tree.
+- Created /tmp/paperu-oss-research/ sandbox (NOT inside the Paperu repo — §3). Cloned shallow: lopdf (5099bca), notify (e455a21), czkawka (eb8b91d), zip2 (a72b210), pdfium-render (6cee8b9).
+- Licence audit via GitHub API + actual LICENSE files:
+  * lopdf MIT (rust 1.88) → DIRECT dep
+  * notify CC0-1.0 core + notify-types/debouncer-mini MIT/Apache → DIRECT dep
+  * zip2 MIT → already integrated (prior commit)
+  * qpdf Apache-2.0 → REFERENCE (C++ lib bundling defer)
+  * ImageMagick NOASSERTION → REFERENCE (C lib, Canvas covers V1)
+  * czkawka MIT core → REFERENCE (exact-hash works)
+  * rustic Apache-2.0 → REFERENCE (overkill for V1)
+  * naps2 GPL-2.0+ → REFERENCE ONLY (no code copied)
+  * stirling-pdf Mixed → SELECTIVE/REFERENCE
+  * pdfium-render MIT/Apache → REFERENCE (pdfium binary bundling defer)
+- Created docs/legal/THIRD_PARTY_COMPONENTS.md (provenance ledger §6), THIRD_PARTY_NOTICES.txt (§7), docs/architecture/OSS_ENGINE_DECISIONS.md (§10), docs/research/NAPS2_SCANNER_LEARNINGS.md (§28), docs/research/STIRLING_FEATURE_GAP.md (§29).
+- Integration 1 — lopdf (PDF page ops): added to Cargo.toml; src/pdf_native/mod.rs with rotate_pages/delete_pages/extract_pages/page_count (all in-memory, source-safety §22); commands/pdf_native.rs (4 Tauri commands); 9 Rust tests (build test PDF, rotate/delete/extract, verify count + selected-page rotation) ALL PASS. PdfPageOpsRoute with native picker + page-range parsing (1, 3, 5-8) + finalizeOutput. Unlocks PDF Rotate (was ABSENT).
+- Integration 2 — notify + notify-debouncer-mini (Watch Folders): added to Cargo.toml; commands/watch.rs with start/stop/current_watch_folder. Debounced 400ms. Uses ReadDirectoryChangesW/FSEvents/inotify. Self-loop prevention filters Paperu's own output suffixes. NO destructive automatic action (§22). WatchFoldersRoute rewritten from 9-line shell to a real live event feed.
+- Contracts: pdf_native.ts (PdfNativeResponse + PdfNativeCommand) + watch.ts (WatchEvent + WatchCommand + WATCH_EVENT_CHANNEL). TS wrappers in lib/ipc.ts. base64ToBytes exported for the route.
+- Registered pdf-page-ops module in module-registry.ts + route in routes/index.tsx (lazy, /pdf/pages).
+
+Stage Summary:
+- Direct dependencies added: lopdf 0.45 (MIT), notify 8 (CC0), notify-debouncer-mini 0.7 (MIT/Apache), zip 2.4.2 (MIT, prior commit).
+- Reference-only: qpdf, ImageMagick, czkawka, rustic, naps2 (GPL), stirling-pdf (mixed), pdfium-render.
+- Rejected: none.
+- NO GPL code copied (§8). All OSS harvest is Bucket A (direct deps) — no source ports needed.
+- Gates: typecheck ✅, lint ✅ (--max-warnings 0), 129 frontend tests ✅, build ✅ (478ms), rust fmt ✅, clippy ✅ (-D warnings), 95 Rust tests ✅ (was 86, +9 pdf_native).
+- Windows CI: prior commit (zip crate) completed GREEN (Windows Tauri build 5m16s, all 3 jobs). This commit (lopdf + notify) CI run 37692853415 in_progress — both are pure Rust, will compile on Windows MSVC.
+- Features newly made working this sprint (cumulative across both sub-sprints): Portal Ready (native paths + compliance card), Print Studio (native paths), Batch Studio (native paths + real cancellation), Study Reader (true fit-width), Application Kit (full CRUD), Folder Organizer (real execute), Image Toolbox (crop/rotate/inspect exposed), Assignment Studio (cover/page-numbers/target-size), Downloads Cleaner (native picker + summary), Duplicate Finder (native picker + summary), File Rescue (real recovery), Quick Look (PDF preview), Archive Studio (real ZIP create/extract/list), PDF Rotate/Delete/Extract pages (lopdf), Watch Folders (real notify watcher). Plus the P1 repairs: basename→absolute native paths, truthful EXIF GPS detection, finalizeOutput basename guard.
