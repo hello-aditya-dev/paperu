@@ -13,6 +13,9 @@ import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import { TargetSizeInput, type TargetSize } from "@/components/TargetSizeInput";
 import { fitPdfToSize, type PdfFitProgress } from "@/engines/pdf-engine";
@@ -44,6 +47,16 @@ export function PdfFitView(): React.ReactNode {
   const [dragging, setDragging] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("pdf");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setState({ kind: "ready", file: staged });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   // Listen for native Tauri drag-drop.
   useEffect(() => {
@@ -142,6 +155,8 @@ export function PdfFitView(): React.ReactNode {
         "pdf",
         result.bytes,
       );
+      // 4. Stage the output for composable workflows (next action).
+      stage(finalized.output, "pdf-fit", state.file.path);
       setState({
         kind: "done",
         outputPath: finalized.outputPath,
@@ -413,6 +428,7 @@ export function PdfFitView(): React.ReactNode {
               Process another
             </Button>
           </div>
+          <NextActions exclude="pdf-fit" />
           <p className="paperu-section__privacy" style={{ marginTop: "var(--paperu-space-4)" }}>
             <span aria-hidden="true">🔒</span> Processed on this PC · 0 bytes
             uploaded · Output saved next to the original

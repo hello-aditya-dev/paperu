@@ -14,6 +14,9 @@ import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import { SignaturePad } from "@/components/SignaturePad";
 import { signPdf, renderPdfPage, type PdfFitProgress, type PageRenderResult } from "@/engines/pdf-engine";
@@ -50,6 +53,28 @@ export function SignPdfView(): React.ReactNode {
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("pdf");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setState({ kind: "ready", file: staged });
+      setStagedFile(staged);
+      let cancelled = false;
+      readFileBytes(staged.path)
+        .then((bytes) => {
+          if (cancelled) return;
+          setFileBytes(bytes);
+          setPage(1);
+          setPick(null);
+          void renderPage(bytes, 1);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,6 +225,8 @@ export function SignPdfView(): React.ReactNode {
         onProgress: (p) => setState({ kind: "running", progress: p }),
       });
       const finalized = await finalizeOutput(stagedFile.path, "-signed", "pdf", out);
+      // Stage the output for composable workflows (next action).
+      stage(finalized.output, "sign-pdf", stagedFile.path);
       setState({ kind: "done", outputPath: finalized.outputPath });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -387,6 +414,7 @@ export function SignPdfView(): React.ReactNode {
             <Button variant="outline" onClick={() => void revealPath(state.outputPath)}>Open folder</Button>
             <Button variant="ghost" onClick={reset}>Sign another</Button>
           </div>
+          <NextActions exclude="sign-pdf" />
         </Card>
       )}
 

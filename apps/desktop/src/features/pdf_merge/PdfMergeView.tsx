@@ -11,6 +11,9 @@ import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import { mergePdfs, type PdfFitProgress } from "@/engines/pdf-engine";
 
@@ -39,6 +42,19 @@ export function PdfMergeView(): React.ReactNode {
   const [state, setState] = useState<State>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("pdf");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setFiles((prev) => {
+        if (prev.some((f) => f.path === staged.path)) return prev;
+        return [...prev, { path: staged.path, result: staged }];
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +145,8 @@ export function PdfMergeView(): React.ReactNode {
         "pdf",
         merged,
       );
+      // Stage the output for composable workflows (next action).
+      stage(finalized.output, "pdf-merge", files[0]?.path);
       setState({
         kind: "done",
         outputPath: finalized.outputPath,
@@ -293,6 +311,7 @@ export function PdfMergeView(): React.ReactNode {
             <Button variant="outline" onClick={() => void revealPath(state.outputPath)}>Open folder</Button>
             <Button variant="ghost" onClick={reset}>Merge another</Button>
           </div>
+          <NextActions exclude="pdf-merge" />
         </Card>
       )}
 
