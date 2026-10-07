@@ -1,0 +1,124 @@
+# ─────────────────────────────────────────────────────────────
+# Paperu — Main CI pipeline
+#
+# Runs on every pull request and push to main.
+# Validates TypeScript, Rust, and the full frontend build.
+# Windows-specific Tauri build runs on a Windows runner.
+# ─────────────────────────────────────────────────────────────
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Frontend validation (runs on all platforms) ──────────────
+  frontend:
+    name: Frontend (typecheck · lint · test · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Frontend tests
+        run: pnpm run test
+
+      - name: Frontend production build
+        run: pnpm run build
+
+  # ── Rust core validation (runs on any platform) ─────────────
+  rust-core:
+    name: Rust core (fmt · clippy · test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "apps/desktop/src-tauri"
+
+      - name: Rustfmt check
+        run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check
+
+      - name: Clippy (core, no tauri-runtime)
+        run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Rust tests (core)
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+  # ── Windows Tauri build (the real desktop target) ────────────
+  windows-build:
+    name: Windows Tauri build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "apps/desktop/src-tauri"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend build
+        run: pnpm run build
+
+      - name: Rust fmt check
+        run: cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check
+
+      - name: Clippy (with tauri-runtime)
+        run: cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets --features tauri-runtime -- -D warnings
+
+      - name: Rust tests (with tauri-runtime)
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --features tauri-runtime
+
+      - name: Tauri production build
+        run: pnpm --filter @paperu/desktop tauri build --features tauri-runtime
+        env:
+          # No code-signing certificate in CI. The build still
+          # produces an unsigned installer for validation.
+          TAURI_SIGNING_PRIVATE_KEY: ""
