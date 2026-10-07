@@ -70,3 +70,42 @@ pub fn pdf_native_page_count(path: String) -> Result<u32> {
     let bytes = read_source(&path)?;
     Ok(pdf_native::page_count(&bytes))
 }
+
+#[tauri::command]
+pub fn inspect_pdf_metadata(path: String) -> Result<pdf_native::PdfMetadata> {
+    let bytes = read_source(&path)?;
+    pdf_native::inspect_metadata(&bytes)
+}
+
+#[tauri::command]
+pub fn remove_pdf_metadata(path: String) -> Result<PdfNativeResponse> {
+    let bytes = read_source(&path)?;
+    let out = pdf_native::remove_metadata(&bytes)?;
+    Ok(PdfNativeResponse::from_bytes(out))
+}
+
+#[tauri::command]
+pub fn set_pdf_page_size(
+    path: String,
+    width: f64,
+    height: f64,
+    pages: Vec<u32>,
+) -> Result<PdfNativeResponse> {
+    let bytes = read_source(&path)?;
+    let out = pdf_native::set_page_size(&bytes, width, height, &pages)?;
+    Ok(PdfNativeResponse::from_bytes(out))
+}
+
+#[tauri::command]
+pub fn reorder_pdf_pages(path: String, order: Vec<u32>) -> Result<PdfNativeResponse> {
+    let bytes = read_source(&path)?;
+    let out = pdf_native::reorder_pages(&bytes, &order)?;
+    Ok(PdfNativeResponse::from_bytes(out))
+}
+
+#[tauri::command]
+pub fn reverse_pdf_pages(path: String) -> Result<PdfNativeResponse> {
+    let bytes = read_source(&path)?;
+    let out = pdf_native::reverse_pages(&bytes)?;
+    Ok(PdfNativeResponse::from_bytes(out))
+}

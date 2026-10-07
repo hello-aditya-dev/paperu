@@ -110,6 +110,205 @@ pub fn page_count(bytes: &[u8]) -> u32 {
     }
 }
 
+// ── PDF metadata (inspect / remove) — 90% §24 ─────────────────────
+
+/// The metadata fields Paperu inspects + can remove. All optional.
+#[derive(Debug, Clone, serde::Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfMetadata {
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub subject: Option<String>,
+    pub keywords: Option<String>,
+    pub creator: Option<String>,
+    pub producer: Option<String>,
+    pub creation_date: Option<String>,
+    pub mod_date: Option<String>,
+}
+
+/// Inspect the PDF Info dictionary (Title/Author/Subject/Keywords/
+/// Creator/Producer/CreationDate/ModDate). Never reads page contents —
+/// metadata only. Used for the privacy/sharing report.
+pub fn inspect_metadata(bytes: &[u8]) -> Result<PdfMetadata> {
+    let doc = load_doc(bytes)?;
+    let info_id = match doc.trailer.get(b"Info") {
+        Ok(Object::Reference(id)) => Some(*id),
+        _ => None,
+    };
+    let mut meta = PdfMetadata::default();
+    if let Some(id) = info_id {
+        if let Ok(info) = doc.get_object(id) {
+            if let Ok(dict) = info.as_dict() {
+                // lopdf stores PDF strings as Object::String(Vec<u8>, StringFormat).
+                // as_str() returns &[u8]; we decode lossily (metadata is text).
+                let read_field = |field: &[u8]| -> Option<String> {
+                    dict.get(field)
+                        .ok()
+                        .and_then(|o| o.as_str().ok())
+                        .map(|b| String::from_utf8_lossy(b).to_string())
+                };
+                meta.title = read_field(b"Title");
+                meta.author = read_field(b"Author");
+                meta.subject = read_field(b"Subject");
+                meta.keywords = read_field(b"Keywords");
+                meta.creator = read_field(b"Creator");
+                meta.producer = read_field(b"Producer");
+                meta.creation_date = read_field(b"CreationDate");
+                meta.mod_date = read_field(b"ModDate");
+            }
+        }
+    }
+    Ok(meta)
+}
+
+/// Remove the PDF Info dictionary fields (privacy: strip Author/Title/
+/// Creator/Producer/etc.). The Info dict is left as an empty dictionary
+/// so the trailer stays valid; the fields are gone. The original is never
+/// modified — this works on an in-memory copy.
+pub fn remove_metadata(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut doc = load_doc(bytes)?;
+    if let Some(info_id) = doc
+        .trailer
+        .get(b"Info")
+        .ok()
+        .and_then(|o| o.as_reference().ok())
+    {
+        // Replace the Info dict with an empty dictionary (preserves the
+        // trailer reference; clears all metadata fields).
+        doc.set_object(info_id, lopdf::Dictionary::new());
+    }
+    save_doc_to_bytes(doc)
+}
+
+// ── Page geometry (set page size) — 90% §23 ────────────────────────
+
+/// Standard page sizes (width × height in PDF points, 1pt = 1/72").
+pub const A4_W: f64 = 595.28;
+pub const A4_H: f64 = 841.89;
+pub const LETTER_W: f64 = 612.0;
+pub const LETTER_H: f64 = 792.0;
+pub const LEGAL_W: f64 = 612.0;
+pub const LEGAL_H: f64 = 1008.0;
+
+/// Set the MediaBox of every (or selected) page to a custom size.
+/// `pages` is 1-based; empty = all pages. The MediaBox is [0 0 width height].
+/// No distortion — the page content isn't scaled, only the page boundary
+/// changes. (For fit-to-page scaling, the caller uses pdf-lib embedPages.)
+pub fn set_page_size(bytes: &[u8], width: f64, height: f64, pages: &[u32]) -> Result<Vec<u8>> {
+    if width <= 0.0 || height <= 0.0 {
+        return Err(AppError::builder(
+            code::INVALID_INPUT,
+            ErrorCategory::Validation,
+            "Page width and height must be positive.",
+        )
+        .build());
+    }
+    let mut doc = load_doc(bytes)?;
+    let all_pages = doc.get_pages();
+    let target: std::collections::HashSet<u32> = if pages.is_empty() {
+        all_pages.keys().copied().collect()
+    } else {
+        pages.iter().copied().collect()
+    };
+    let media_box = vec![
+        Object::Integer(0),
+        Object::Integer(0),
+        Object::Real(width as f32),
+        Object::Real(height as f32),
+    ];
+    for (&page_num, &page_id) in &all_pages {
+        if !target.contains(&page_num) {
+            continue;
+        }
+        let page_dict = doc
+            .get_object_mut(page_id)
+            .and_then(|obj| obj.as_dict_mut())
+            .map_err(|e| {
+                AppError::builder(
+                    code::PROCESSING_FAILED,
+                    ErrorCategory::Processing,
+                    "Paperu couldn't read a page in that PDF.",
+                )
+                .technical(e.to_string())
+                .build()
+            })?;
+        page_dict.set("MediaBox", Object::Array(media_box.clone()));
+    }
+    save_doc_to_bytes(doc)
+}
+
+// ── Reorder / reverse pages — 90% §22 ─────────────────────────────
+
+/// Reorder pages to the given 1-based order. `order` must contain every
+/// page number exactly once (a permutation). The page tree's Kids array
+/// is rebuilt in the new order. Returns an error if `order` is not a
+/// valid permutation of 1..=N.
+pub fn reorder_pages(bytes: &[u8], order: &[u32]) -> Result<Vec<u8>> {
+    let mut doc = load_doc(bytes)?;
+    let all_pages = doc.get_pages(); // BTreeMap<u32, ObjectId> in page order
+    let n = all_pages.len() as u32;
+    if order.len() as u32 != n {
+        return Err(AppError::builder(
+            code::INVALID_INPUT,
+            ErrorCategory::Validation,
+            "The reorder list must include every page exactly once.",
+        )
+        .technical(format!("got {} entries, expected {}", order.len(), n))
+        .build());
+    }
+    // Validate it's a permutation of 1..=n.
+    let mut sorted: Vec<u32> = order.to_vec();
+    sorted.sort_unstable();
+    let expected: Vec<u32> = (1..=n).collect();
+    if sorted != expected {
+        return Err(AppError::builder(
+            code::INVALID_INPUT,
+            ErrorCategory::Validation,
+            "The reorder list must include every page exactly once (no duplicates, no gaps).",
+        )
+        .build());
+    }
+    // Build the reordered Kids array from the page object IDs.
+    let mut kids: Vec<Object> = Vec::with_capacity(order.len());
+    for &page_num in order {
+        if let Some(&page_id) = all_pages.get(&page_num) {
+            kids.push(Object::Reference(page_id));
+        }
+    }
+    // Find the Pages root + set its Kids.
+    let pages_root = doc.trailer.get(b"Root").and_then(|o| o.as_reference()).ok();
+    if let Some(root_id) = pages_root {
+        if let Ok(root) = doc.get_object_mut(root_id) {
+            if let Ok(catalog) = root.as_dict_mut() {
+                if let Ok(Object::Reference(pages_id)) = catalog.get(b"Pages") {
+                    let pages_id = *pages_id;
+                    if let Ok(pages_dict) = doc.get_object_mut(pages_id) {
+                        if let Ok(pd) = pages_dict.as_dict_mut() {
+                            pd.set("Kids", Object::Array(kids));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    save_doc_to_bytes(doc)
+}
+
+/// Reverse the page order (last page first). Convenience over reorder_pages.
+pub fn reverse_pages(bytes: &[u8]) -> Result<Vec<u8>> {
+    let n = page_count(bytes);
+    if n == 0 {
+        return Err(AppError::builder(
+            code::EMPTY_INPUT,
+            ErrorCategory::Validation,
+            "That PDF has no pages to reverse.",
+        )
+        .build());
+    }
+    let order: Vec<u32> = (1..=n).rev().collect();
+    reorder_pages(bytes, &order)
+}
+
 // ── helpers ────────────────────────────────────────────────────────
 
 fn load_doc(bytes: &[u8]) -> Result<Document> {
@@ -358,5 +557,83 @@ mod tests {
         assert_eq!(bytes_to_base64(b"Ma"), "TWE=");
         // Round-trip a 3-byte block.
         assert_eq!(bytes_to_base64(b"abc"), "YWJj");
+    }
+
+    // ── metadata / page geometry / reorder tests (90% §22-24) ───────
+
+    #[test]
+    fn inspect_metadata_on_test_pdf_returns_none_fields() {
+        // The build_test_pdf helper creates no Info dict → all fields None.
+        let bytes = build_test_pdf(2);
+        let meta = inspect_metadata(&bytes).unwrap();
+        assert!(meta.title.is_none());
+        assert!(meta.author.is_none());
+        assert!(meta.producer.is_none());
+    }
+
+    #[test]
+    fn remove_metadata_preserves_page_count() {
+        let bytes = build_test_pdf(3);
+        let out = remove_metadata(&bytes).unwrap();
+        assert_eq!(page_count(&out), 3, "metadata removal must not drop pages");
+    }
+
+    #[test]
+    fn set_page_size_a4_changes_mediabox() {
+        let bytes = build_test_pdf(2);
+        let out = set_page_size(&bytes, A4_W, A4_H, &[]).unwrap();
+        assert_eq!(page_count(&out), 2);
+        // Re-load + verify the MediaBox is [0 0 595.28 841.89].
+        let doc = Document::load_mem(&out).unwrap();
+        let pages = doc.get_pages();
+        for page_id in pages.values() {
+            let page = doc.get_object(*page_id).unwrap();
+            let dict = page.as_dict().unwrap();
+            let mbox = dict.get(b"MediaBox").unwrap();
+            let arr = mbox.as_array().unwrap();
+            assert_eq!(arr[0].as_i64().unwrap(), 0);
+            assert_eq!(arr[1].as_i64().unwrap(), 0);
+            // width is Real(595.28) — check it's > 590.
+            let w = match &arr[2] {
+                Object::Real(r) => f64::from(*r),
+                Object::Integer(i) => *i as f64,
+                _ => 0.0,
+            };
+            assert!((w - A4_W).abs() < 1.0, "MediaBox width ≈ A4 width");
+        }
+    }
+
+    #[test]
+    fn set_page_size_rejects_nonpositive() {
+        let bytes = build_test_pdf(1);
+        assert!(set_page_size(&bytes, 0.0, 100.0, &[]).is_err());
+        assert!(set_page_size(&bytes, -1.0, 100.0, &[]).is_err());
+    }
+
+    #[test]
+    fn reverse_pages_preserves_count() {
+        let bytes = build_test_pdf(4);
+        let out = reverse_pages(&bytes).unwrap();
+        assert_eq!(page_count(&out), 4);
+    }
+
+    #[test]
+    fn reorder_pages_validates_permutation() {
+        let bytes = build_test_pdf(3);
+        // Wrong length.
+        assert!(reorder_pages(&bytes, &[1, 2]).is_err());
+        // Duplicate.
+        assert!(reorder_pages(&bytes, &[1, 1, 3]).is_err());
+        // Gap.
+        assert!(reorder_pages(&bytes, &[1, 2, 4]).is_err());
+        // Valid permutation succeeds.
+        assert!(reorder_pages(&bytes, &[3, 1, 2]).is_ok());
+        assert!(reorder_pages(&bytes, &[2, 3, 1]).is_ok());
+    }
+
+    #[test]
+    fn reverse_pages_on_empty_pdf_errors() {
+        // An empty byte slice isn't a valid PDF → load_doc fails → page_count=0.
+        assert!(reverse_pages(&[]).is_err());
     }
 }

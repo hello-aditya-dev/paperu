@@ -30,6 +30,7 @@ import type {
   Note,
   NoteFolder,
   OrganizerRule,
+  PdfMetadata,
   PdfNativeResponse,
   ReadingHistoryEntry,
   RecentWorkEntry,
@@ -517,6 +518,39 @@ export async function extractPdfPages(
 /** Get the page count of a local PDF. */
 export async function pdfNativePageCount(path: string): Promise<number> {
   return call<number>(PdfNativeCommand.PageCount, { path });
+}
+
+/** Inspect the PDF Info dictionary metadata (Title/Author/Creator/etc). */
+export async function inspectPdfMetadata(path: string): Promise<PdfMetadata> {
+  return call<PdfMetadata>(PdfNativeCommand.InspectMetadata, { path });
+}
+
+/** Remove the PDF Info dictionary fields (privacy: strip metadata). */
+export async function removePdfMetadata(path: string): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.RemoveMetadata, { path });
+}
+
+/** Set the MediaBox of every (or selected) page to a custom size. */
+export async function setPdfPageSize(
+  path: string,
+  width: number,
+  height: number,
+  pages: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.SetPageSize, { path, width, height, pages });
+}
+
+/** Reorder pages to the given 1-based permutation. */
+export async function reorderPdfPages(
+  path: string,
+  order: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Reorder, { path, order });
+}
+
+/** Reverse the page order (last page first). */
+export async function reversePdfPages(path: string): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Reverse, { path });
 }
 
 // ── Watch Folders (notify + debouncer) ────────────────────────────
