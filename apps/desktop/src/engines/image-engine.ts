@@ -362,19 +362,99 @@ export interface ImageMetadata {
   format: string;
 }
 
+/**
+ * Lightweight JPEG EXIF GPS detector — no external dependency.
+ *
+ * EXIF is carried in a JPEG APP1 segment (marker 0xFFE1) whose payload
+ * begins with the signature "Exif\0\0", followed by a TIFF header. The
+ * TIFF header declares byte order (II = little-endian, MM = big-endian),
+ * a magic (0x002A), and an offset to IFD0. IFD0 entries are 12 bytes
+ * each: tag(2) + type(2) + count(4) + value/offset(4). The GPS IFD is
+ * pointed to by tag 0x8825 (GPSInfoIFDPointer) in IFD0; if that tag is
+ * present and its value is a non-zero offset, the image carries real
+ * GPS coordinates. EXIF presence alone does NOT prove GPS presence.
+ *
+ * Returns { hasExif, hasGps } based on what is actually in the bytes.
+ * For non-JPEG formats (PNG, WebP, etc.) this returns false unless we
+ * can positively detect EXIF — we never claim GPS that isn't there.
+ */
+export function detectJpegExifGps(buf: Uint8Array): { hasExif: boolean; hasGps: boolean } {
+  // A JPEG starts with SOI (FF D8). Each segment is FF <marker> <len:2 BE> <data>.
+  if (buf.length < 4 || buf[0]! !== 0xff || buf[1]! !== 0xd8) {
+    return { hasExif: false, hasGps: false };
+  }
+  let offset = 2;
+  // Walk segments until we find an APP1 (0xE1) carrying "Exif\0\0".
+  while (offset + 4 <= buf.length) {
+    if (buf[offset]! !== 0xff) break; // malformed — bail out.
+    const marker = buf[offset + 1]!;
+    offset += 2;
+    // Standalone markers (no length): RSTn, SOI, EOI, TEM.
+    if (marker === 0xd9 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      continue;
+    }
+    if (offset + 2 > buf.length) break;
+    const segLen = (buf[offset]! << 8) | buf[offset + 1]!;
+    if (segLen < 2 || offset + segLen > buf.length) break;
+    const segDataStart = offset + 2;
+    if (marker === 0xe1) {
+      // APP1 — check for EXIF signature.
+      const EXIF_SIG = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00]; // "Exif\0\0"
+      let isExif = true;
+      for (let i = 0; i < EXIF_SIG.length; i++) {
+        if (buf[segDataStart + i]! !== EXIF_SIG[i]!) { isExif = false; break; }
+      }
+      if (isExif) {
+        const tiffStart = segDataStart + 6;
+        return parseTiffForGps(buf, tiffStart, segDataStart + segLen - 2);
+      }
+    }
+    offset += segLen;
+  }
+  return { hasExif: false, hasGps: false };
+}
+
+/** Parse the TIFF header + IFD0 to determine whether a GPS IFD is pointed to. */
+function parseTiffForGps(buf: Uint8Array, tiffStart: number, segEnd: number): { hasExif: true; hasGps: boolean } {
+  if (tiffStart + 8 > segEnd) return { hasExif: true, hasGps: false };
+  const byteOrder = (buf[tiffStart]! << 8) | buf[tiffStart + 1]!;
+  const little = byteOrder === 0x4949; // "II" little-endian. "MM" = 0x4D4D big-endian.
+  const readU16 = (off: number): number =>
+    little ? (buf[off]! | (buf[off + 1]! << 8)) : ((buf[off]! << 8) | buf[off + 1]!);
+  const readU32 = (off: number): number =>
+    little
+      ? (buf[off]! | (buf[off + 1]! << 8) | (buf[off + 2]! << 16) | (buf[off + 3]! << 24)) >>> 0
+      : (((buf[off]! << 24) | (buf[off + 1]! << 16) | (buf[off + 2]! << 8) | buf[off + 3]!) >>> 0);
+  const magic = readU16(tiffStart + 2);
+  if (magic !== 0x002a) return { hasExif: true, hasGps: false };
+  const ifd0Offset = readU32(tiffStart + 4);
+  const ifd0Start = tiffStart + ifd0Offset;
+  if (ifd0Start + 2 > segEnd) return { hasExif: true, hasGps: false };
+  const entryCount = readU16(ifd0Start);
+  const GPS_TAG = 0x8825; // GPSInfoIFDPointer
+  for (let i = 0; i < entryCount; i++) {
+    const entry = ifd0Start + 2 + i * 12;
+    if (entry + 12 > segEnd) break;
+    const tag = readU16(entry);
+    if (tag === GPS_TAG) {
+      const valueOffset = readU32(entry + 8);
+      // Non-zero offset means a real GPS IFD follows.
+      if (valueOffset !== 0) return { hasExif: true, hasGps: true };
+    }
+  }
+  // EXIF segment exists but no GPS IFD pointer.
+  return { hasExif: true, hasGps: false };
+}
+
 export async function inspectImageMetadata(file: File): Promise<ImageMetadata> {
   const bmp = await loadBitmap(file);
-  // Canvas re-encoding strips EXIF/GPS by default — the original file
-  // may have metadata, but the re-encoded output won't.
-  // For real EXIF inspection, we'd need an EXIF parser library.
-  // For now, detect EXIF presence via magic bytes.
   const buf = new Uint8Array(await file.arrayBuffer());
-  const hasExif = buf.length >= 4 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xE1;
+  const { hasExif, hasGps } = detectJpegExifGps(buf);
   return {
     width: bmp.width,
     height: bmp.height,
     hasExif,
-    hasGps: hasExif, // conservative: if EXIF exists, GPS might be there
+    hasGps,
     format: file.type || "unknown",
   };
 }
@@ -391,6 +471,7 @@ export async function stripExif(file: File): Promise<{ bytes: Uint8Array; format
   // The output is a clean image with no embedded metadata.
   const blob = await canvasToBlob(canvas, "jpeg", 0.95);
   const bytes = new Uint8Array(await blob.arrayBuffer());
+  // Truthful report: only claim we removed metadata that was ACTUALLY there.
   const meta = await inspectImageMetadata(file);
   const removed: string[] = [];
   if (meta.hasExif) removed.push("EXIF camera metadata");
