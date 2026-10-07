@@ -60,7 +60,7 @@ export function ActionSuggestions({
       label: `Merge ${pdfCount} PDFs`,
       desc: "Combine in order",
       href: "#/pdf/merge",
-      available: false,
+      available: true,
     });
   }
   if (pdfCount === 1) {
@@ -69,7 +69,7 @@ export function ActionSuggestions({
       label: "Split / extract pages",
       desc: "Ranges or every page",
       href: "#/pdf/split",
-      available: false,
+      available: true,
     });
   }
   if (imageCount >= 2) {
