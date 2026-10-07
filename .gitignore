@@ -1,0 +1,77 @@
+# ─────────────────────────────────────────────────────────────
+# Paperu — .gitignore
+# Local-first desktop application. No user documents are ever
+# committed. Only source, configuration, fixtures and docs belong
+# in this repository.
+# ─────────────────────────────────────────────────────────────
+
+# ── Rust / Cargo ─────────────────────────────────────────────
+**/target/
+**/*.rs.bk
+*.pdb
+
+# ── Node / pnpm ───────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+dist/
+dist-ssr/
+*.local
+
+# ── Tauri ─────────────────────────────────────────────────────
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+
+# ── Build artifacts ───────────────────────────────────────────
+*.app
+*.dmg
+*.exe
+*.msi
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.nsis
+
+# ── Logs & local runtime data ─────────────────────────────────
+*.log
+logs/
+paperu-data/
+paperu-cache/
+
+# ── Environment & secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.cert
+secrets/
+SigningCertificate.*
+
+# ── Editor / OS ───────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Test coverage & caches ────────────────────────────────────
+coverage/
+.vite/
+.eslintcache
+.turbo/
+
+# ── Local database files (runtime only, never committed) ──────
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

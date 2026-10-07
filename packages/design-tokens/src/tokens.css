@@ -1,0 +1,177 @@
+/* ════════════════════════════════════════════════════════════════
+ * Paperu — Design Tokens
+ *
+ * A premium paper-inspired aesthetic: calm, tactile, editorial,
+ * precise, professional. NOT a generic SaaS dashboard, NOT neon,
+ * NOT gaming, NOT skeuomorphic parody.
+ *
+ * Tokens are semantic. Components consume semantics
+ * (var(--paperu-surface), var(--paperu-text)), never raw
+ * hex values. This lets light/dark themes swap palettes without
+ * touching components.
+ *
+ * Layering/z-index, radii, spacing, typography, shadows and motion
+ * are all tokenised so future agents never invent one-off values.
+ * ════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Color: background ─────────────────────────────────────── */
+  --paperu-bg: #f6f4ef;            /* warm paper white */
+  --paperu-bg-elevated: #fbfaf6;   /* slightly lifted paper */
+
+  /* ── Color: surfaces ────────────────────────────────────────── */
+  --paperu-surface: #ffffff;       /* card / sheet of paper */
+  --paperu-surface-muted: #f1eee6; /* recessed panel */
+  --paperu-surface-elevated: #ffffff;
+
+  /* ── Color: text ────────────────────────────────────────────── */
+  --paperu-text: #20201c;          /* near-black ink */
+  --paperu-text-muted: #6b6859;    /* graphite */
+  --paperu-text-subtle: #9a9587;   /* faint margin note */
+
+  /* ── Color: borders ────────────────────────────────────────── */
+  --paperu-border: #e4e0d5;        /* hairline rule */
+  --paperu-border-strong: #d2cdbf;
+
+  /* ── Color: accent (ink seal) ──────────────────────────────── */
+  --paperu-accent: #7a4f2b;        /* warm walnut ink */
+  --paperu-accent-hover: #6a4324;
+  --paperu-accent-foreground: #fbfaf6;
+
+  /* ── Color: semantic ────────────────────────────────────────── */
+  --paperu-success: #2f6b4f;
+  --paperu-success-foreground: #ffffff;
+  --paperu-warning: #8a5a16;
+  --paperu-warning-foreground: #ffffff;
+  --paperu-destructive: #9a3232;
+  --paperu-destructive-foreground: #ffffff;
+  --paperu-info: #2f5a7a;
+  --paperu-info-foreground: #ffffff;
+
+  /* ── Radii ──────────────────────────────────────────────────── */
+  --paperu-radius-xs: 2px;
+  --paperu-radius-sm: 4px;
+  --paperu-radius-md: 8px;
+  --paperu-radius-lg: 12px;
+  --paperu-radius-xl: 18px;
+  --paperu-radius-pill: 999px;
+
+  /* ── Spacing (4px base) ─────────────────────────────────────── */
+  --paperu-space-0: 0;
+  --paperu-space-1: 4px;
+  --paperu-space-2: 8px;
+  --paperu-space-3: 12px;
+  --paperu-space-4: 16px;
+  --paperu-space-5: 24px;
+  --paperu-space-6: 32px;
+  --paperu-space-7: 48px;
+  --paperu-space-8: 64px;
+
+  /* ── Typography ─────────────────────────────────────────────── */
+  --paperu-font-sans: "Inter", "Segoe UI", system-ui, -apple-system,
+    "Helvetica Neue", Arial, sans-serif;
+  --paperu-font-serif: "Source Serif 4", "Iowan Old Style", Georgia,
+    "Times New Roman", serif;
+  --paperu-font-mono: "JetBrains Mono", "SFMono-Regular", "Cascadia Code",
+    Consolas, monospace;
+
+  --paperu-text-xs: 0.75rem;     /* 12px */
+  --paperu-text-sm: 0.875rem;    /* 14px */
+  --paperu-text-base: 1rem;      /* 16px */
+  --paperu-text-md: 1.125rem;    /* 18px */
+  --paperu-text-lg: 1.375rem;    /* 22px */
+  --paperu-text-xl: 1.75rem;     /* 28px */
+  --paperu-text-2xl: 2.25rem;    /* 36px */
+
+  --paperu-leading-tight: 1.2;
+  --paperu-leading-normal: 1.5;
+  --paperu-leading-relaxed: 1.7;
+
+  --paperu-weight-normal: 400;
+  --paperu-weight-medium: 500;
+  --paperu-weight-semibold: 600;
+  --paperu-weight-bold: 700;
+
+  /* ── Shadows (soft, paper-physical) ────────────────────────── */
+  --paperu-shadow-xs: 0 1px 1px rgba(32, 32, 28, 0.04);
+  --paperu-shadow-sm: 0 1px 2px rgba(32, 32, 28, 0.06),
+    0 1px 3px rgba(32, 32, 28, 0.04);
+  --paperu-shadow-md: 0 4px 12px rgba(32, 32, 28, 0.08),
+    0 2px 4px rgba(32, 32, 28, 0.04);
+  --paperu-shadow-lg: 0 12px 32px rgba(32, 32, 28, 0.12),
+    0 4px 8px rgba(32, 32, 28, 0.06);
+
+  /* ── Motion ─────────────────────────────────────────────────── */
+  --paperu-duration-fast: 120ms;
+  --paperu-duration-base: 200ms;
+  --paperu-duration-slow: 340ms;
+  --paperu-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --paperu-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* ── Layering / z-index ─────────────────────────────────────── */
+  --paperu-z-base: 0;
+  --paperu-z-raised: 10;
+  --paperu-z-sticky: 100;
+  --paperu-z-overlay: 1000;
+  --paperu-z-modal: 1100;
+  --paperu-z-toast: 1200;
+  --paperu-z-tooltip: 1300;
+
+  /* ── Layout metrics ──────────────────────────────────────────── */
+  --paperu-app-max-width: 1200px;
+  --paperu-rail-width: 248px;
+  --paperu-header-height: 56px;
+}
+
+/* ── Dark theme ────────────────────────────────────────────────────
+ * Dark mode is supported only where it does not compromise the
+ * core paper aesthetic. A muted, low-glare dark paper. */
+@media (prefers-color-scheme: dark) {
+  :root[data-paperu-theme="system"],
+  :root[data-paperu-theme="dark"] {
+    --paperu-bg: #1b1a17;
+    --paperu-bg-elevated: #22211d;
+    --paperu-surface: #282722;
+    --paperu-surface-muted: #1f1e1a;
+    --paperu-surface-elevated: #2c2b26;
+    --paperu-text: #ece9e1;
+    --paperu-text-muted: #a8a497;
+    --paperu-text-subtle: #75716a;
+    --paperu-border: #393832;
+    --paperu-border-strong: #4a4840;
+    --paperu-accent: #c79a6a;
+    --paperu-accent-hover: #d4a87a;
+    --paperu-accent-foreground: #1b1a17;
+    --paperu-success: #5fae84;
+    --paperu-warning: #d39a3e;
+    --paperu-destructive: #d6594f;
+    --paperu-info: #6fa8d6;
+  }
+}
+
+/* Explicit light theme override */
+:root[data-paperu-theme="light"] {
+  color-scheme: light;
+}
+:root[data-paperu-theme="dark"] {
+  color-scheme: dark;
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Focus ring ──────────────────────────────────────────────────── */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--paperu-accent);
+  outline-offset: 2px;
+  border-radius: var(--paperu-radius-sm);
+}

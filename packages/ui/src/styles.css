@@ -1,0 +1,72 @@
+/* Paperu UI primitives — component styles built on design tokens. */
+
+.paperu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--paperu-space-2);
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  font-weight: var(--paperu-weight-medium);
+  line-height: 1;
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  border-radius: var(--paperu-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color var(--paperu-duration-fast)
+      var(--paperu-ease-standard),
+    border-color var(--paperu-duration-fast) var(--paperu-ease-standard),
+    color var(--paperu-duration-fast) var(--paperu-ease-standard);
+  min-height: 40px;
+  user-select: none;
+  white-space: nowrap;
+}
+.paperu-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.paperu-btn--accent {
+  background: var(--paperu-accent);
+  color: var(--paperu-accent-foreground);
+}
+.paperu-btn--accent:hover:not(:disabled) {
+  background: var(--paperu-accent-hover);
+}
+.paperu-btn--outline {
+  background: transparent;
+  color: var(--paperu-text);
+  border-color: var(--paperu-border-strong);
+}
+.paperu-btn--outline:hover:not(:disabled) {
+  background: var(--paperu-surface-muted);
+}
+.paperu-btn--ghost {
+  background: transparent;
+  color: var(--paperu-text);
+}
+.paperu-btn--ghost:hover:not(:disabled) {
+  background: var(--paperu-surface-muted);
+}
+
+.paperu-card {
+  background: var(--paperu-surface);
+  border: 1px solid var(--paperu-border);
+  border-radius: var(--paperu-radius-lg);
+  box-shadow: var(--paperu-shadow-sm);
+}
+
+.paperu-surface-muted {
+  background: var(--paperu-surface-muted);
+  border: 1px solid var(--paperu-border);
+  border-radius: var(--paperu-radius-md);
+}
+
+.paperu-kbd {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  padding: 2px var(--paperu-space-2);
+  border-radius: var(--paperu-radius-sm);
+  background: var(--paperu-surface-muted);
+  border: 1px solid var(--paperu-border);
+  color: var(--paperu-text-muted);
+}

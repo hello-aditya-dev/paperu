@@ -1,0 +1,20 @@
+{
+  "$schema": "paperu-contract:inspect-file-response",
+  "$comment": "Canonical JSON shape for InspectFileResponse. Both the Rust serialization test and the TypeScript parse test must accept this exactly. Changing this file is a contract change requiring a new migration entry.",
+  "path": "/home/paperu/fixtures/report.pdf",
+  "fileName": "report.pdf",
+  "fileStem": "report",
+  "extension": "pdf",
+  "kind": "pdf",
+  "mimeType": "application/pdf",
+  "size": {
+    "bytes": 1048576,
+    "humanReadable": "1.0 MB"
+  },
+  "modifiedAt": "2026-01-15T09:30:00Z",
+  "createdAt": "2026-01-10T14:00:00Z",
+  "accessedAt": "2026-01-15T09:30:00Z",
+  "readOnly": false,
+  "inSyncedFolder": false,
+  "exists": true
+}

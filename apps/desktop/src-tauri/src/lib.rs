@@ -1,0 +1,138 @@
+//! Paperu — Tauri 2 application library.
+//!
+//! This crate is the native side of Paperu. It exposes typed IPC
+//! commands over a Tauri boundary, backed by a local-first filesystem
+//! layer, a SQLite state store, a structured logging sink and a task
+//! engine. See `docs/architecture/` for the full design.
+//!
+//! Product identity: "Paperu" everywhere user-facing.
+//! Identifier: app.paperu.desktop
+//!
+//! The `tauri-runtime` feature gates the Tauri shell. Without it, the
+//! core modules (errors, contracts, filesystem, database, settings,
+//! tasks, logging, security, licensing) compile and test on any
+//! platform — this is how CI verifies core logic without GTK deps.
+
+#![forbid(unsafe_code)]
+#![warn(clippy::all, clippy::pedantic, clippy::cargo)]
+#![allow(
+    clippy::module_name_repetitions,
+    clippy::needless_doctest_main,
+    clippy::must_use_candidate,
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::result_large_err,
+    clippy::too_many_lines,
+    clippy::struct_excessive_bools,
+    clippy::cast_possible_truncation,
+    clippy::cast_precision_loss,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::default_trait_access,
+    clippy::explicit_iter_loop,
+    clippy::manual_string_new,
+    clippy::redundant_closure_for_method_calls,
+    clippy::unnecessary_wraps,
+    clippy::if_not_else,
+    clippy::semicolon_if_nothing_returned,
+    clippy::match_same_arms,
+    clippy::unnested_or_patterns,
+    clippy::uninlined_format_args,
+    clippy::assigning_clones,
+    clippy::needless_pass_by_value,
+    clippy::derivable_impls,
+    clippy::return_self_not_must_use
+)]
+#![allow(clippy::multiple_crate_versions)]
+
+pub mod commands;
+pub mod contracts;
+pub mod database;
+pub mod engines;
+pub mod errors;
+pub mod filesystem;
+pub mod licensing;
+pub mod logging;
+pub mod product;
+pub mod security;
+pub mod settings;
+pub mod tasks;
+
+#[cfg(feature = "tauri-runtime")]
+pub mod state;
+
+// ── Tauri runtime (only compiled with the `tauri-runtime` feature) ─
+
+#[cfg(feature = "tauri-runtime")]
+mod runtime {
+    use crate::commands::inspect::inspect_file;
+    use crate::commands::read_app_info;
+    use crate::commands::settings::{read_settings, write_settings};
+    use crate::state::AppState;
+    use tauri::Manager;
+
+    /// Resolve the per-user app data directory for Paperu.
+    fn resolve_app_data_dir(app: &tauri::AppHandle) -> std::path::PathBuf {
+        app.path()
+            .app_local_data_dir()
+            .unwrap_or_else(|_| std::env::temp_dir().join("paperu"))
+    }
+
+    /// Build and run the Paperu Tauri application.
+    pub fn run() {
+        tauri::Builder::default()
+            .plugin(tauri_plugin_dialog::init())
+            .setup(|app| {
+                let app_data_dir = resolve_app_data_dir(app.handle());
+                std::fs::create_dir_all(&app_data_dir).ok();
+
+                // Initialise structured local logging (no remote logging).
+                let log_dir = crate::logging::default_log_dir(&app_data_dir);
+                std::fs::create_dir_all(&log_dir).ok();
+                crate::logging::init(&log_dir);
+
+                // Open / migrate the local SQLite database.
+                let db_path = crate::database::default_db_path(&app_data_dir);
+                let db = match crate::database::Database::open(&db_path) {
+                    Ok(db) => db,
+                    Err(err) => {
+                        tracing::error!(error = %err, "database open failed");
+                        return Err(Box::new(err) as Box<dyn std::error::Error>);
+                    }
+                };
+
+                // Startup recovery: clean stale temp outputs.
+                if let Ok(ws) = crate::filesystem::temp::TempWorkspace::ensure() {
+                    if let Err(err) = ws.startup_cleanup() {
+                        tracing::warn!(error = %err, "temp cleanup failed");
+                    }
+                }
+
+                let state = AppState {
+                    db,
+                    tasks: crate::tasks::TaskRegistry::new(),
+                    app_data_dir,
+                };
+                app.manage(state);
+
+                tracing::info!(version = env!("CARGO_PKG_VERSION"), "Paperu started");
+                Ok(())
+            })
+            .invoke_handler(tauri::generate_handler![
+                inspect_file,
+                read_settings,
+                write_settings,
+                read_app_info,
+            ])
+            .run(tauri::generate_context!())
+            .expect("Paperu failed to start");
+    }
+}
+
+/// Build and run the Paperu desktop application.
+/// Only available with the `tauri-runtime` feature.
+#[cfg(feature = "tauri-runtime")]
+pub fn run() {
+    runtime::run();
+}

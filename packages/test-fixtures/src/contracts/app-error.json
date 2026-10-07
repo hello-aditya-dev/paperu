@@ -1,0 +1,12 @@
+{
+  "$schema": "paperu-contract:app-error",
+  "$comment": "Canonical JSON shape for a serialized AppError rejected by Tauri IPC.",
+  "code": "filesystem.file_not_found",
+  "category": "filesystem",
+  "severity": "error",
+  "recoverability": "action_required",
+  "message": "Paperu could not find that file.",
+  "detail": "The path no longer exists. It may have been moved or deleted.",
+  "technical": "std::fs::metadata returned NotFound for the resolved path",
+  "correlationId": "c6a1f0e0-0000-4000-8000-000000000001"
+}

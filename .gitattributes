@@ -1,0 +1,21 @@
+# Normalize line endings on checkout regardless of platform.
+* text=auto eol=lf
+
+# Rust source — always LF.
+*.rs text eol=lf
+*.toml text eol=lf
+
+# Windows-specific files — CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.zip binary

@@ -1,0 +1,39 @@
+{
+  "name": "paperu",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Paperu — a Windows-first, local-first file workspace. Privacy-preserving document and file utilities for your computer.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "packageManager": "pnpm@12.9.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "install:all": "pnpm install",
+    "dev": "pnpm --filter @paperu/desktop dev",
+    "dev:tauri": "pnpm --filter @paperu/desktop tauri dev",
+    "build": "pnpm --filter @paperu/desktop build",
+    "build:tauri": "pnpm --filter @paperu/desktop tauri build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:rust": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --workspace",
+    "fmt:rust": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all",
+    "fmt:rust:check": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --all -- --check",
+    "clippy": "cargo clippy --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run fmt:rust:check && pnpm run clippy && pnpm run test:rust",
+    "clean": "pnpm -r exec rimraf dist node_modules .turbo && rimraf apps/desktop/src-tauri/target"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  }
+}

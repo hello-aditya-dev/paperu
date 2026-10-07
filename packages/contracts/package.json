@@ -1,0 +1,27 @@
+{
+  "name": "@paperu/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed IPC contracts between the Paperu React layer and the Tauri/Rust layer. The formal agreement that keeps both sides in sync.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./errors": "./src/errors.ts",
+    "./inspect": "./src/inspect.ts",
+    "./tasks": "./src/tasks.ts",
+    "./settings": "./src/settings.ts",
+    "./operations": "./src/operations.ts",
+    "./progress": "./src/progress.ts",
+    "./common": "./src/common.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3"
+  }
+}

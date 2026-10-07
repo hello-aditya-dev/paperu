@@ -1,0 +1,8 @@
+# Paperu — Rust toolchain pinning
+# Pinned for reproducible builds across agents and CI.
+
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
+targets = ["x86_64-pc-windows-msvc"]

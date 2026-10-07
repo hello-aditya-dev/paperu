@@ -1,0 +1,6 @@
+# Paperu — pnpm workspace definition
+# A monorepo: one desktop app plus shared packages.
+
+packages:
+  - "apps/*"
+  - "packages/*"
