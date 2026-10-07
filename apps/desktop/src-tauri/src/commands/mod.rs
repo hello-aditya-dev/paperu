@@ -23,6 +23,7 @@ pub mod read_file;
 pub mod reading_history;
 #[cfg(feature = "tauri-runtime")]
 pub mod recent_work;
+pub mod save_as;
 #[cfg(feature = "tauri-runtime")]
 pub mod settings;
 pub mod shell;
@@ -39,6 +40,7 @@ pub use read_file::*;
 pub use reading_history::*;
 #[cfg(feature = "tauri-runtime")]
 pub use recent_work::*;
+pub use save_as::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
 pub use shell::*;
