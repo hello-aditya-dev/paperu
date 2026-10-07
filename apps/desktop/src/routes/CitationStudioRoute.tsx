@@ -35,7 +35,11 @@ export function CitationStudioRoute(): React.ReactNode {
   const updatePreview = useCallback(async () => {
     if (!title) { setPreview(""); return; }
     try {
-      const res = await invoke<string>(CitationCommand.Format, { entry: buildEntry(), style });
+      const res = await invoke<string>(CitationCommand.Format, {
+        entry: { id: null, sourceType, authors, editors: null, year: year || null,
+          title, publisher: publisher || null, volume: volume || null,
+          issue: issue || null, pages: pages || null, url: url || null,
+          doi: doi || null, isbn: isbn || null, notes: null }, style });
       setPreview(res);
     } catch { setPreview(""); }
   }, [sourceType, authors, title, year, publisher, volume, issue, pages, url, doi, isbn, style]);
