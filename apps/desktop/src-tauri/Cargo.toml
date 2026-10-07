@@ -51,6 +51,12 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 uuid = { version = "1.27", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# Archive Studio — safe ZIP create/extract (Feature 15, Wave D §32).
+# Pure Rust, MIT/Apache-2.0, well-maintained, no existing dep solves
+# ZIP. Extraction reuses our validate_zip_entry + is_contained +
+# is_suspicious_ratio guards for ZIP-Slip + decompression-bomb safety.
+zip = { version = "2", default-features = false, features = ["deflate", "time"] }
+
 # Tauri runtime (optional — enables the desktop shell + IPC commands)
 tauri = { version = "2.12", features = [], optional = true }
 tauri-plugin-dialog = { version = "2.8", optional = true }

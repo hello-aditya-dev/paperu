@@ -185,6 +185,9 @@ mod runtime {
                 crate::commands::archive_studio::validate_zip_entry,
                 crate::commands::archive_studio::check_suspicious_ratio,
                 crate::commands::archive_studio::check_destination_contained,
+                crate::commands::archive_studio::list_archive,
+                crate::commands::archive_studio::extract_archive,
+                crate::commands::archive_studio::create_archive,
             ])
             .run(tauri::generate_context!())
             .expect("Paperu failed to start");

@@ -19,11 +19,14 @@ import type {
   ApplicationKitItem,
   CreateNoteFolderRequest,
   CreateNoteRequest,
+  CreateResult,
   DryRunResult,
   ExecuteResult,
+  ExtractResult,
   FileEntry,
   DuplicateGroup,
   InspectFileResponse,
+  ListResult,
   Note,
   NoteFolder,
   OrganizerRule,
@@ -38,6 +41,7 @@ import type {
 } from "@paperu/contracts";
 import {
   ApplicationKitCommand,
+  ArchiveCommand,
   CleanerCommand,
   CommandName,
   DuplicateCommand,
@@ -440,6 +444,27 @@ export async function findExactDuplicates(folder: string): Promise<DuplicateGrou
  *  Conservative — never modifies the original. */
 export async function diagnoseFile(path: string): Promise<RescueDiagnosis> {
   return call<RescueDiagnosis>(RescueCommand.Diagnose, { path });
+}
+
+// ── Archive Studio (safe ZIP create/extract/list) ─────────────────
+
+/** List the entries of a ZIP archive. Unsafe entry names are rejected,
+ *  not silently skipped. The archive is never extracted here. */
+export async function listArchive(path: string): Promise<ListResult> {
+  return call<ListResult>(ArchiveCommand.List, { path });
+}
+
+/** Extract a ZIP archive into a destination directory. ZIP-Slip + symlink
+ *  escape + decompression-bomb guards run on every entry. Never overwrites
+ *  existing files (collisions are reported in `skipped`). */
+export async function extractArchive(path: string, dest: string): Promise<ExtractResult> {
+  return call<ExtractResult>(ArchiveCommand.Extract, { path, dest });
+}
+
+/** Create a ZIP archive from a list of files (deflate compression).
+ *  One unreadable source file is skipped (reported), not fatal. */
+export async function createArchive(archivePath: string, files: readonly string[]): Promise<CreateResult> {
+  return call<CreateResult>(ArchiveCommand.Create, { archivePath, files });
 }
 
 // ── Notes ────────────────────────────────────────────────────────

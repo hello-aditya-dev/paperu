@@ -80,7 +80,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Folder Organizer | USEFUL | yes | ✅ native folder pickers + execute + confirmation | ✅ Rust execute (move/copy + cross-volume fallback) | ✅ SQLite | ✅ Rust (3 execute tests) | ✅ | undo |
 | Quick Look | USEFUL | yes | ✅ images + text + PDF preview (lazy pdfjs) + reveal/open | ✅ | — | — | ✅ | thumbnails, audio/video |
 | Image Toolbox (Offline Converter) | USEFUL | yes | ✅ convert/resize/crop/rotate/inspect/strip + native paths | ✅ Canvas | — | ✅ detectJpegExifGps (9 tests) | ✅ | batch, visual crop selection |
-| Archive Studio | FOUNDATION | no | ✅ stub | ✅ Rust validation | — | ✅ Rust | ✅ | actual ZIP create/extract |
+| Archive Studio | USEFUL | yes | ✅ list/extract/create + native pickers + save dialog | ✅ Rust (`zip` crate) — ZIP-Slip + decompression-bomb + never-overwrite guards | — | ✅ Rust (3 round-trip tests) | ✅ | recursive folder zip |
 | File Rescue | USEFUL | yes | ✅ diagnose + real recovery (re-encode fresh copy) | ✅ Rust | — | ✅ Rust | ✅ | more recovery strategies |
 | File Inspector | USEFUL | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | metadata detail, privacy indicators |
 | Clipboard History | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | capture, search, pin, security review |
