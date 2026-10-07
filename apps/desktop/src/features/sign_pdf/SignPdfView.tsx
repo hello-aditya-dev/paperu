@@ -49,6 +49,7 @@ export function SignPdfView(): React.ReactNode {
   const [pick, setPick] = useState<Pick | null>(null);
   const [widthPt, setWidthPt] = useState(140);
   const [pageRender, setPageRender] = useState<PageRenderResult | null>(null);
+  const [pagePreviewUrl, setPagePreviewUrl] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -179,6 +180,19 @@ export function SignPdfView(): React.ReactNode {
     setSigPreviewUrl(url);
     return () => { URL.revokeObjectURL(url); };
   }, [sigPng]);
+
+  // Manage the page preview as a Blob URL (not toDataURL — doctrine §10:
+  // avoid repeatedly creating huge base64 strings). Revoked on change.
+  useEffect(() => {
+    if (!pageRender) { setPagePreviewUrl(null); return; }
+    let url: string | null = null;
+    pageRender.canvas.toBlob((blob) => {
+      if (!blob) return;
+      url = URL.createObjectURL(blob);
+      setPagePreviewUrl(url);
+    }, "image/png");
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [pageRender]);
 
   const heightPt = sigDims ? (widthPt * sigDims.h) / sigDims.w : widthPt * 0.4;
 
@@ -344,7 +358,7 @@ export function SignPdfView(): React.ReactNode {
                   >
                     {/* The rendered page canvas is appended as an img via data URL */}
                     <img
-                      src={pageRender.canvas.toDataURL()}
+                      src={pagePreviewUrl ?? undefined}
                       alt={`Page ${page} preview`}
                       style={{ display: "block", maxWidth: "100%", pointerEvents: "none" }}
                     />

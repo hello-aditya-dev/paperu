@@ -330,7 +330,12 @@ export async function mergePdfs(
     pages.forEach((p) => out.addPage(p));
   }
   onProgress?.({ fraction: 1, stage: "Finalizing" });
-  return out.save({ useObjectStreams: true });
+  const bytes = await out.save({ useObjectStreams: true });
+  const validation = await validatePdfBytes(bytes);
+  if (!validation.valid) {
+    throw new Error(`Paperu produced an invalid PDF after merge: ${validation.error}`);
+  }
+  return bytes;
 }
 
 /** Parse "1-3, 5, 8-10" against a page count. Returns 0-based indices. */
@@ -376,7 +381,12 @@ export async function extractPages(
     const [page] = await out.copyPages(src, [indices[i]!]);
     out.addPage(page);
   }
-  return out.save({ useObjectStreams: true });
+  const outBytes = await out.save({ useObjectStreams: true });
+  const validation = await validatePdfBytes(outBytes);
+  if (!validation.valid) {
+    throw new Error(`Paperu produced an invalid PDF after page extraction: ${validation.error}`);
+  }
+  return outBytes;
 }
 
 export async function splitEveryPage(
@@ -394,7 +404,12 @@ export async function splitEveryPage(
     const single = await PDFDocument.create();
     const [page] = await single.copyPages(src, [i]);
     single.addPage(page);
-    out.push(await single.save({ useObjectStreams: true }));
+    const partBytes = await single.save({ useObjectStreams: true });
+    const validation = await validatePdfBytes(partBytes);
+    if (!validation.valid) {
+      throw new Error(`Paperu produced an invalid PDF splitting page ${i + 1}: ${validation.error}`);
+    }
+    out.push(partBytes);
   }
   return out;
 }
@@ -482,7 +497,12 @@ export async function imagesToPdf(
       height: drawH,
     });
   }
-  return out.save({ useObjectStreams: true });
+  const bytes = await out.save({ useObjectStreams: true });
+  const validation = await validatePdfBytes(bytes);
+  if (!validation.valid) {
+    throw new Error(`Paperu produced an invalid PDF after image-to-PDF conversion: ${validation.error}`);
+  }
+  return bytes;
 }
 
 /** Rasterize an image File to PNG bytes via canvas (for webp/bmp/gif/fallback). */
@@ -627,7 +647,12 @@ export async function signPdf(
     rotate: degrees(0),
   });
   onProgress?.({ fraction: 1, stage: "Done" });
-  return doc.save({ useObjectStreams: true });
+  const outBytes = await doc.save({ useObjectStreams: true });
+  const validation = await validatePdfBytes(outBytes);
+  if (!validation.valid) {
+    throw new Error(`Paperu produced an invalid PDF after signing: ${validation.error}`);
+  }
+  return outBytes;
 }
 
 // ── Fill / Annotate (overlay text/date/checkbox) ──────────────────
@@ -707,7 +732,12 @@ export async function fillPdf(
       stage: `Placing field ${i + 1}`,
     });
   }
-  return doc.save({ useObjectStreams: true });
+  const outBytes = await doc.save({ useObjectStreams: true });
+  const validation = await validatePdfBytes(outBytes);
+  if (!validation.valid) {
+    throw new Error(`Paperu produced an invalid PDF after fill/annotate: ${validation.error}`);
+  }
+  return outBytes;
 }
 
 // ── Render a single PDF page to a canvas (for preview) ────────────

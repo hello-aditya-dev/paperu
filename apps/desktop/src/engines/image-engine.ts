@@ -206,6 +206,11 @@ export async function fitImageToSize(
 
   onProgress?.({ fraction: 1, stage: requirementMet ? "Done" : "Lowest safe result" });
 
+  // Validate output before declaring success (doctrine §47).
+  const verifyBlob = new Blob([best.bytes.slice()], { type: "image/octet-stream" });
+  const verifyBmp = await createImageBitmap(verifyBlob);
+  verifyBmp.close?.();
+
   return {
     bytes: best.bytes,
     format,
