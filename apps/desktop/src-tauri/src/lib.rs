@@ -77,6 +77,7 @@ pub mod rename;
 pub mod security;
 pub mod settings;
 pub mod tasks;
+pub mod watch;
 
 #[cfg(feature = "tauri-runtime")]
 pub mod state;
