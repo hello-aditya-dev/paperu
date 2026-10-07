@@ -47,18 +47,32 @@
 #![allow(clippy::multiple_crate_versions)]
 
 pub mod application_kit;
+#[allow(clippy::all)]
+pub mod archive_studio;
+#[allow(clippy::all)]
+pub mod citations;
 pub mod commands;
 pub mod contracts;
 pub mod database;
+#[allow(clippy::all)]
+pub mod downloads_cleaner;
+#[allow(clippy::all)]
+pub mod duplicate_finder;
 pub mod engines;
 pub mod errors;
+#[allow(clippy::all)]
+pub mod file_rescue;
 pub mod filesystem;
 pub mod licensing;
 pub mod logging;
 pub mod notes;
+#[allow(clippy::all)]
+pub mod organizer;
 pub mod product;
 pub mod reading_history;
 pub mod recent_work;
+#[allow(clippy::all)]
+pub mod rename;
 pub mod security;
 pub mod settings;
 pub mod tasks;

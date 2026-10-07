@@ -88,6 +88,28 @@ const PaperuSendRoute = lazy(() =>
 const OnboardingRoute = lazy(() =>
   import("./OnboardingRoute").then((m) => ({ default: m.OnboardingRoute })),
 );
+// ── Zero→50% feature expansion routes (lazy) ─────────────────────
+const RenameStudioRoute = lazy(() => import("./RenameStudioRoute").then((m) => ({ default: m.RenameStudioRoute })));
+const FilenameFixerRoute = lazy(() => import("./FilenameFixerRoute").then((m) => ({ default: m.FilenameFixerRoute })));
+const DuplicateFinderRoute = lazy(() => import("./DuplicateFinderRoute").then((m) => ({ default: m.DuplicateFinderRoute })));
+const QuickLookRoute = lazy(() => import("./QuickLookRoute").then((m) => ({ default: m.QuickLookRoute })));
+const DownloadsCleanerRoute = lazy(() => import("./DownloadsCleanerRoute").then((m) => ({ default: m.DownloadsCleanerRoute })));
+const FolderOrganizerRoute = lazy(() => import("./FolderOrganizerRoute").then((m) => ({ default: m.FolderOrganizerRoute })));
+const CitationStudioRoute = lazy(() => import("./CitationStudioRoute").then((m) => ({ default: m.CitationStudioRoute })));
+const StudyPacksRoute = lazy(() => import("./StudyPacksRoute").then((m) => ({ default: m.StudyPacksRoute })));
+const PdfNotebookRoute = lazy(() => import("./PdfNotebookRoute").then((m) => ({ default: m.PdfNotebookRoute })));
+const WebpageToPdfRoute = lazy(() => import("./WebpageToPdfRoute").then((m) => ({ default: m.WebpageToPdfRoute })));
+const ScreenshotBridgeRoute = lazy(() => import("./ScreenshotBridgeRoute").then((m) => ({ default: m.ScreenshotBridgeRoute })));
+const DocumentScannerRoute = lazy(() => import("./DocumentScannerRoute").then((m) => ({ default: m.DocumentScannerRoute })));
+const ClipboardHistoryRoute = lazy(() => import("./ClipboardHistoryRoute").then((m) => ({ default: m.ClipboardHistoryRoute })));
+const OfflineConverterRoute = lazy(() => import("./OfflineConverterRoute").then((m) => ({ default: m.OfflineConverterRoute })));
+const ArchiveStudioRoute = lazy(() => import("./ArchiveStudioRoute").then((m) => ({ default: m.ArchiveStudioRoute })));
+const FileRescueRoute = lazy(() => import("./FileRescueRoute").then((m) => ({ default: m.FileRescueRoute })));
+const UsbToolboxRoute = lazy(() => import("./UsbToolboxRoute").then((m) => ({ default: m.UsbToolboxRoute })));
+const BackupRecipesRoute = lazy(() => import("./BackupRecipesRoute").then((m) => ({ default: m.BackupRecipesRoute })));
+const TimerJobsRoute = lazy(() => import("./TimerJobsRoute").then((m) => ({ default: m.TimerJobsRoute })));
+const WatchFoldersRoute = lazy(() => import("./WatchFoldersRoute").then((m) => ({ default: m.WatchFoldersRoute })));
+
 
 /** A minimal loading fallback for lazy routes. */
 function RouteLoading(): React.ReactNode {
@@ -147,6 +169,28 @@ export const router = createHashRouter([
       { path: "batch", element: withSuspense(<BatchStudioRoute />) },
       { path: "send", element: withSuspense(<PaperuSendRoute />) },
       { path: "onboarding", element: withSuspense(<OnboardingRoute />) },
+      // ── Zero→50% feature expansion routes ───────────────────
+      { path: "rename", element: withSuspense(<RenameStudioRoute />) },
+      { path: "filename-fixer", element: withSuspense(<FilenameFixerRoute />) },
+      { path: "duplicates", element: withSuspense(<DuplicateFinderRoute />) },
+      { path: "quick-look", element: withSuspense(<QuickLookRoute />) },
+      { path: "cleaner", element: withSuspense(<DownloadsCleanerRoute />) },
+      { path: "organizer", element: withSuspense(<FolderOrganizerRoute />) },
+      { path: "citations", element: withSuspense(<CitationStudioRoute />) },
+      { path: "study-packs", element: withSuspense(<StudyPacksRoute />) },
+      { path: "notebook", element: withSuspense(<PdfNotebookRoute />) },
+      { path: "webpage-pdf", element: withSuspense(<WebpageToPdfRoute />) },
+      { path: "screenshot-bridge", element: withSuspense(<ScreenshotBridgeRoute />) },
+      { path: "scanner", element: withSuspense(<DocumentScannerRoute />) },
+      { path: "clipboard", element: withSuspense(<ClipboardHistoryRoute />) },
+      { path: "converter", element: withSuspense(<OfflineConverterRoute />) },
+      { path: "archive", element: withSuspense(<ArchiveStudioRoute />) },
+      { path: "rescue", element: withSuspense(<FileRescueRoute />) },
+      { path: "usb", element: withSuspense(<UsbToolboxRoute />) },
+      { path: "backup", element: withSuspense(<BackupRecipesRoute />) },
+      { path: "timer", element: withSuspense(<TimerJobsRoute />) },
+      { path: "watch", element: withSuspense(<WatchFoldersRoute />) },
+
     ],
   },
 ]);

@@ -46,10 +46,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "reading_history",
         sql: include_str!("../../migrations/0005_reading_history.sql"),
     },
+    Migration {
+        version: 6,
+        label: "feature_expansion",
+        sql: include_str!("../../migrations/0006_feature_expansion.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 5;
+pub const LATEST_VERSION: u32 = 6;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
