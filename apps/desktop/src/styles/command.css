@@ -1,0 +1,180 @@
+/* Paperu — Command Center styles.
+ * Master Prompt 3 §10: warm paper, ink text, blue selection,
+ * minimal border/rule structure, no SaaS palette cliché.
+ */
+
+.paperu-header__command {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-2);
+  padding: 6px var(--paperu-space-3);
+  border-radius: var(--paperu-radius-md);
+  border: 1px solid var(--paperu-border);
+  background: var(--paperu-surface-muted);
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-sm);
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.paperu-header__command:hover {
+  background: var(--paperu-surface);
+  border-color: var(--paperu-border-strong);
+  color: var(--paperu-text);
+}
+.paperu-header__command:focus-visible {
+  outline: 2px solid var(--paperu-accent);
+  outline-offset: 1px;
+}
+.paperu-header__command-label {
+  font-family: var(--paperu-font-sans);
+}
+.paperu-header__command .paperu-kbd {
+  font-size: var(--paperu-text-xs);
+}
+
+/* ── Command overlay ──────────────────────────────────────────── */
+.paperu-command {
+  position: fixed;
+  inset: 0;
+  z-index: var(--paperu-z-modal, 100);
+  background: color-mix(in srgb, var(--paperu-ink) 35%, transparent);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh var(--paperu-space-4) var(--paperu-space-4);
+}
+
+.paperu-command__panel {
+  width: min(640px, 100%);
+  max-height: 76vh;
+  background: var(--paperu-bg);
+  border: 1px solid var(--paperu-border-strong);
+  border-radius: var(--paperu-radius-lg);
+  box-shadow: var(--paperu-shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.18));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.paperu-command__header {
+  display: flex;
+  align-items: center;
+  gap: var(--paperu-space-3);
+  padding: var(--paperu-space-3) var(--paperu-space-4);
+  border-bottom: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+}
+.paperu-command__title {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  letter-spacing: 0.12em;
+  color: var(--paperu-text-muted);
+  flex-shrink: 0;
+}
+.paperu-command__input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-md);
+  color: var(--paperu-text);
+  outline: none;
+}
+.paperu-command__input::placeholder {
+  color: var(--paperu-text-muted);
+  font-style: italic;
+}
+.paperu-command__esc {
+  flex-shrink: 0;
+}
+
+.paperu-command__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--paperu-space-2) 0;
+}
+
+.paperu-command__empty {
+  padding: var(--paperu-space-6) var(--paperu-space-4);
+  text-align: center;
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-sm);
+}
+
+.paperu-command__section {
+  padding: var(--paperu-space-2) 0;
+}
+.paperu-command__section-title {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  letter-spacing: 0.12em;
+  color: var(--paperu-text-muted);
+  padding: var(--paperu-space-1) var(--paperu-space-4);
+  margin: 0;
+  text-transform: uppercase;
+}
+.paperu-command__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.paperu-command__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--paperu-space-3);
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.paperu-command__row.is-active {
+  background: color-mix(in srgb, var(--paperu-accent) 12%, transparent);
+  border-left-color: var(--paperu-accent);
+}
+.paperu-command__row.is-active .paperu-command__row-label {
+  color: var(--paperu-accent);
+}
+.paperu-command__row-label {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-md);
+  color: var(--paperu-text);
+  flex-shrink: 0;
+}
+.paperu-command__row-hint {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+  flex: 1;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paperu-command__footer {
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+}
+.paperu-command__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-2);
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+}
+.paperu-command__hint .paperu-kbd {
+  margin-right: var(--paperu-space-1);
+}
+
+/* ── Reduced motion ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .paperu-command,
+  .paperu-command__panel,
+  .paperu-command__row {
+    transition: none !important;
+    animation: none !important;
+  }
+}
