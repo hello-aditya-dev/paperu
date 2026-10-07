@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { inspectFile, readFileBytes, finalizeOutput } from "@/lib/ipc";
+import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
 import { Card, Button } from "@paperu/ui";
 import { TargetSizeInput, type TargetSize } from "@/components/TargetSizeInput";
 import { fitImageToSize, type ImgFitProgress } from "@/engines/image-engine";
@@ -327,7 +327,9 @@ export function ImageFitView(): React.ReactNode {
             </p>
           )}
           <div className="paperu-fitresult__actions">
-            <Button variant="accent" onClick={reset}>Process another</Button>
+            <Button variant="accent" onClick={() => void openPath(state.outputPath)}>Open file</Button>
+            <Button variant="outline" onClick={() => void revealPath(state.outputPath)}>Open folder</Button>
+            <Button variant="ghost" onClick={reset}>Process another</Button>
           </div>
           <p className="paperu-section__privacy" style={{ marginTop: "var(--paperu-space-4)" }}>
             <span aria-hidden="true">🔒</span> Processed on this PC · 0 bytes uploaded · Output saved next to the original

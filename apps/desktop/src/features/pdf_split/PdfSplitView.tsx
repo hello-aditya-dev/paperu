@@ -10,7 +10,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { inspectFile, readFileBytes, finalizeOutput } from "@/lib/ipc";
+import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
 import { Card, Button } from "@paperu/ui";
 import {
   parsePageRanges,
@@ -348,7 +348,21 @@ export function PdfSplitView(): React.ReactNode {
             ))}
           </ul>
           <div className="paperu-fitresult__actions">
-            <Button variant="accent" onClick={reset}>Split another</Button>
+            <Button
+              variant="accent"
+              onClick={() => void openPath(state.outputs[0]!)}
+              disabled={state.outputs.length === 0}
+            >
+              Open first file
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void revealPath(state.outputs[0]!)}
+              disabled={state.outputs.length === 0}
+            >
+              Open folder
+            </Button>
+            <Button variant="ghost" onClick={reset}>Split another</Button>
           </div>
         </Card>
       )}

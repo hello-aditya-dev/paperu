@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { inspectFile, readFileBytes, finalizeOutput } from "@/lib/ipc";
+import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
 import { Card, Button } from "@paperu/ui";
 import { TargetSizeInput, type TargetSize } from "@/components/TargetSizeInput";
 import { fitPdfToSize, type PdfFitProgress } from "@/engines/pdf-engine";
@@ -403,7 +403,13 @@ export function PdfFitView(): React.ReactNode {
             </p>
           )}
           <div className="paperu-fitresult__actions">
-            <Button variant="accent" onClick={reset}>
+            <Button variant="accent" onClick={() => void openPath(state.outputPath)}>
+              Open file
+            </Button>
+            <Button variant="outline" onClick={() => void revealPath(state.outputPath)}>
+              Open folder
+            </Button>
+            <Button variant="ghost" onClick={reset}>
               Process another
             </Button>
           </div>
