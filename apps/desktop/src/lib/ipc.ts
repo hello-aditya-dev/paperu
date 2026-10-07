@@ -100,6 +100,35 @@ export async function inspectFile(
   return call<InspectFileResponse>(CommandName.InspectFile, args);
 }
 
+/**
+ * Inspect multiple local files. Returns one result per path, preserving
+ * order. Each file is inspected independently; a failure on one file does
+ * not prevent the others from being inspected. The `onResult` callback is
+ * invoked as each inspection completes so the UI can stream updates.
+ *
+ * No file content is read; only metadata. The original files are never
+ * modified.
+ */
+export async function inspectFiles(
+  paths: readonly string[],
+  onResult?: (path: string, result: InspectFileResponse | AppError) => void,
+): Promise<InspectFileResponse[]> {
+  const results: InspectFileResponse[] = [];
+  // Inspect sequentially to avoid flooding the IPC channel and to give
+  // the UI a steady stream of real progress. Bounded parallelism could be
+  // added later if batch performance demands it.
+  for (const path of paths) {
+    try {
+      const r = await inspectFile(path);
+      results.push(r);
+      onResult?.(path, r);
+    } catch (err) {
+      onResult?.(path, err as AppError);
+    }
+  }
+  return results;
+}
+
 /** Read the current settings. */
 export async function readSettings(): Promise<Settings> {
   return call<Settings>(CommandName.ReadSettings);

@@ -1,7 +1,7 @@
-/** Home route — the Local File Inspect proof. */
+/** Home route — the Universal Drop experience. */
 
-import { InspectView } from "@/features/inspect/InspectView";
+import { UniversalDrop } from "@/features/drop/UniversalDrop";
 
 export function HomeRoute(): React.ReactNode {
-  return <InspectView />;
+  return <UniversalDrop />;
 }
