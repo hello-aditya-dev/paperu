@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { pickAndInspectFiles, readFileBytes } from "@/lib/file-picker";
-import { convertImage, resizeImage, stripExif, inspectImageMetadata } from "@/engines/image-engine";
+import { convertImage, resizeImage, stripExif } from "@/engines/image-engine";
 
 type ConvertAction = "convert" | "resize" | "clean-metadata";
 
