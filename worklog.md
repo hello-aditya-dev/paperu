@@ -134,3 +134,57 @@ Stage Summary:
 - Final gate counts: 110 TS tests (was 86) + 27 Rust tests (was 22), all green. clippy zero warnings. Initial bundle ~115 kB gzip (was ~395 kB).
 - NOT done (honest, documented in AGENT_HANDOFF.md + KNOWN_LIMITATIONS.md): Save As (Tauri dialog), Simple Mode toggle, desktop lifecycle (single instance, open-file arg, window state), shutdown/crash-marker, performance instrumentation, final 20-min manual polish pass.
 - Hard blockers unchanged: no webkit2gtk (Tauri shell not buildable), no Windows runner (Windows CI not triggerable). All non-Tauri-runtime gates green.
+
+---
+Task ID: 4
+Agent: Builder (Z.ai Code, sandbox environment — authenticated with PAT)
+Task: Paperu Master Prompt 4 — Windows Consumer V1 Release Candidate. Build the consumer product surface (Assignment Studio, Portal Ready, Application Kit, Study Reader, Notes, Print Studio, Batch Studio, Paperu Send, Onboarding) + the Rust + DB foundation they need.
+
+Work Log:
+- Wrote 3 new SQLite migrations (0003 application_kit, 0004 notes, 0005 reading_history). Bumped LATEST_VERSION to 5. All idempotent.
+- Wrote 3 new Rust logic modules: application_kit (add/list/update/remove), notes (create/list/get/update/autosave/soft_delete/restore/purge_deleted/create_folder/list_folders/search_notes), reading_history (upsert/get_for_path/list/remove/clear).
+- Wrote 3 new Rust contracts: application_kit.rs, notes.rs, reading_history.rs (i64 sizes for SQLite storage, camelCase JSON serialization).
+- Wrote 3 new Tauri command wrappers (all feature-gated to tauri-runtime): commands/application_kit.rs, commands/notes.rs, commands/reading_history.rs. 19 new commands total.
+- Wrote 3 new TS contracts: application_kit.ts, notes.ts, reading_history.ts.
+- Extended ipc.ts with 19 new typed IPC functions.
+- Wrote 9 new frontend routes (all lazy-loaded):
+  - AssignmentStudioRoute (/assignment) — orchestrates imagesToPdf + mergePdfs
+  - PortalReadyRoute (/portal) — uses fitPdfToSize/fitImageToSize + compliance card
+  - ApplicationKitRoute (/kit) — list/add/remove kit items
+  - StudyReaderRoute (/reader) — pdfjs render + page nav + reading-position persistence
+  - NotesRoute (/notes) — list/create/edit/autosave/search/soft-delete
+  - PrintStudioRoute (/print) — 1/2/4-up via pdf-lib embedPages
+  - BatchStudioRoute (/batch) — serial queue with isolated failures
+  - PaperuSendRoute (/send) — FEATURE-FLAGGED OUT (honest "not available")
+  - OnboardingRoute (/onboarding) — profile choice + reassurance
+- Expanded module registry with 9 new entries. Removed duplicate legacy 'notes'/'assignments' stubs.
+- Honest feature-flagging per §92: paperu-send and onboarding are available: false (hidden from Command + Nav). Paperu Send needs Tauri runtime + ephemeral session token + path validation + bounded uploads — none runtime-testable here (§0, §46).
+
+Stage Summary:
+- agent/builder final state: `308eb26` on origin.
+- 4 coherent commits past `d6ec58d` baseline (all pushed to origin/agent/builder):
+  1. d08435c feat(consumer-v1): Rust core for Application Kit + Notes + Reading History
+  2. 308eb26 feat(consumer-v1): frontend routes for Assignment/Portal/Kit/Reader/Notes/Print/Batch/Send + Onboarding
+- Final gate counts:
+  - TS typecheck: ✅ green (5 packages)
+  - ESLint: ✅ green (5 packages, --max-warnings 0)
+  - TS tests: ✅ 110 tests pass (unchanged from last sprint — new routes don't add unit tests; their behavior is engine-backed and would need integration tests that this sandbox can't runtime-run)
+  - Frontend production build: ✅ green, ~115 kB gzip initial JS (unchanged — new routes are lazy)
+  - cargo fmt --check: ✅ green
+  - cargo clippy -D warnings: ✅ zero warnings
+  - cargo test: ✅ 40 Rust tests pass (was 27; +13 new: 4 application_kit, 5 notes, 4 reading_history)
+- NOT done (honest, environment-blocked):
+  - Windows installer (.msi/.exe) — no Windows runner, no Tauri build capability in this sandbox
+  - Code signing — no signing certificate
+  - Tauri runtime features (single-instance, open-file argument, window state) — no webkit2gtk system deps
+  - Save As (Tauri save dialog) — same Tauri-runtime gap
+  - Direct printer integration — Print Studio generates print-ready PDF only
+  - Grayscale rasterization — needs runtime testing
+  - Assignment Studio cover page / page numbers / A4 normalization / signature overlay — need pdf-lib code paths this sandbox can't runtime-verify
+  - Study Reader highlights/bookmarks/annotations/tabs — §0: don't ship half-built
+  - Notes rich text editor — same §0
+  - Paperu Send LAN server — feature-flagged out
+  - Performance instrumentation markers (§64)
+  - Guardian runtime attack (§88)
+  - Manual stranger test (§90)
+- Hard environment blockers unchanged: no webkit2gtk, no Windows runner, no signing cert. All non-Tauri-runtime gates green.
