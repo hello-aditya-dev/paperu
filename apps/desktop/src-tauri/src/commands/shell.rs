@@ -11,6 +11,7 @@
 //! commands are narrow-purpose Rust functions, not general shell
 //! executors. The Tauri capability surface is unchanged.
 
+#[allow(unused_imports)]
 use std::path::Path;
 
 use crate::contracts::common::FilePath;

@@ -70,13 +70,6 @@ pub mod state;
 
 #[cfg(feature = "tauri-runtime")]
 mod runtime {
-    use crate::commands::finalize::finalize_output;
-    use crate::commands::inspect::inspect_file;
-    use crate::commands::pdf_info::pdf_page_count;
-    use crate::commands::read_app_info;
-    use crate::commands::read_file::read_file_bytes;
-    use crate::commands::settings::{read_settings, write_settings};
-    use crate::commands::shell::{open_path, reveal_path};
     use crate::state::AppState;
     use tauri::Manager;
 
