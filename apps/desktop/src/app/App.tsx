@@ -5,13 +5,15 @@
  * the footer to the bottom naturally, and a sticky footer. Loads app
  * info + settings from Rust on mount and applies the resolved theme.
  *
- * The nav rail lists the tools that are currently available. Tools that
- * are not yet ported are not shown (the doctrine says: don't clutter the
- * UI with unfinished features).
+ * The nav rail is derived from the module registry (getNavModules()).
+ * There is no separate hardcoded NAV list (Master Prompt 3 §3, §16).
+ *
+ * The Command Center overlay is mounted here and is opened with
+ * Ctrl/⌘ + K (Master Prompt 3 §6).
  */
 
 import { useEffect, useState } from "react";
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink, useNavigate } from "react-router";
 import type { AppInfo, Settings } from "@paperu/contracts";
 import { DEFAULT_SETTINGS } from "@paperu/contracts";
 import { readAppInfo, readSettings } from "@/lib/ipc";
@@ -19,27 +21,10 @@ import { useTheme } from "@/hooks/useTheme";
 import { AppInfoBadge } from "@/components/AppInfoBadge";
 import { PrivacyFooter } from "@/components/PrivacyFooter";
 import { StartupPoster } from "@/components/StartupPoster";
+import { CommandCenter } from "@/components/CommandCenter";
+import { Shelf } from "@/components/shelf/Shelf";
 import { formatShortcut } from "@/lib/platform";
-
-interface NavItem {
-  to: string;
-  label: string;
-  glyph: string;
-  shortcut: string;
-  end?: boolean;
-}
-
-const NAV: readonly NavItem[] = [
-  { to: "/", label: "Home", glyph: "⌂", shortcut: "1", end: true },
-  { to: "/pdf/fit", label: "Make PDF fit", glyph: "▾", shortcut: "2" },
-  { to: "/image/fit", label: "Make image fit", glyph: "▾", shortcut: "3" },
-  { to: "/pdf/merge", label: "Merge PDFs", glyph: "⋑", shortcut: "4" },
-  { to: "/pdf/split", label: "Split / Extract", glyph: "⫻", shortcut: "5" },
-  { to: "/pdf/from-images", label: "Images → PDF", glyph: "⋐", shortcut: "6" },
-  { to: "/pdf/to-images", label: "PDF → Images", glyph: "⫾", shortcut: "7" },
-  { to: "/pdf/sign", label: "Sign PDF", glyph: "✎", shortcut: "8" },
-  { to: "/pdf/fill", label: "Fill PDF", glyph: "✦", shortcut: "9" },
-];
+import { getNavModules, type ModuleEntry } from "@/lib/module-registry";
 
 export function App(): React.ReactNode {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -47,9 +32,12 @@ export function App(): React.ReactNode {
   const [initStage, setInitStage] = useState("Opening Paperu…");
   const [ready, setReady] = useState(false);
   const [initFailed, setInitFailed] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const navigate = useNavigate();
 
   useTheme(settings.theme, settings.reducedMotion);
 
+  // ── Startup initialization ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setInitStage("Opening Paperu…");
@@ -77,9 +65,21 @@ export function App(): React.ReactNode {
     };
   }, []);
 
-  // Keyboard shortcuts: mod+1..5 navigates to the tools.
+  // Build the nav rail once from the registry.
+  const NAV_ITEMS: readonly ModuleEntry[] = getNavModules();
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────
+  // - Ctrl/⌘ + K: open Command Center (global, even inside inputs)
+  // - Ctrl/⌘ + 1..9: jump to the module whose `shortcut` field matches
+  //   (NOT positional — the digit is the module's stable identity).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey;
+      if (isMod && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setCommandOpen((prev) => !prev);
+        return;
+      }
       if (e.target instanceof HTMLElement) {
         const tag = e.target.tagName;
         if (
@@ -91,19 +91,26 @@ export function App(): React.ReactNode {
           return;
         }
       }
-      const isMod = e.metaKey || e.ctrlKey;
       if (isMod && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
-        const idx = parseInt(e.key, 10) - 1;
-        const item = NAV[idx];
+        const item = NAV_ITEMS.find((m) => m.shortcut === e.key);
         if (item) {
-          window.location.hash = item.to === "/" ? "/" : item.to;
+          window.location.hash = item.route === "/" ? "/" : item.route;
         }
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [NAV_ITEMS]);
+
+  const onCommandNavigate = (route: string) => {
+    setCommandOpen(false);
+    if (route.startsWith("#")) {
+      // Overlay (e.g. shelf) — no navigation.
+      return;
+    }
+    navigate(route);
+  };
 
   // Show the startup poster while real init work happens (doctrine §12).
   // The poster is removed the moment the app is genuinely usable.
@@ -133,6 +140,17 @@ export function App(): React.ReactNode {
             </span>
             <span className="paperu-brand__name">Paperu</span>
           </a>
+          <button
+            type="button"
+            className="paperu-header__command"
+            onClick={() => setCommandOpen(true)}
+            aria-label="Open Paperu Command"
+          >
+            <span className="paperu-header__command-label">Search</span>
+            <kbd className="paperu-kbd" aria-hidden="true">
+              {formatShortcut("K")}
+            </kbd>
+          </button>
           <AppInfoBadge info={info} />
         </div>
       </header>
@@ -140,22 +158,27 @@ export function App(): React.ReactNode {
       <div className="paperu-shell__body">
         <nav className="paperu-nav" aria-label="Paperu tools">
           <ul className="paperu-nav__list">
-            {NAV.map((item) => (
-              <li key={item.to} className="paperu-nav__item">
+            {NAV_ITEMS.map((item) => (
+              <li key={item.id} className="paperu-nav__item">
                 <NavLink
-                  to={item.to}
-                  end={item.end}
+                  to={item.route}
+                  end={item.route === "/"}
                   className={({ isActive }) =>
                     `paperu-nav__link${isActive ? " is-active" : ""}`
                   }
                 >
                   <span className="paperu-nav__glyph" aria-hidden="true">
-                    {item.glyph}
+                    {item.glyph ?? "·"}
                   </span>
                   <span className="paperu-nav__label">{item.label}</span>
-                  <kbd className="paperu-kbd paperu-nav__shortcut" aria-hidden="true">
-                    {formatShortcut(item.shortcut)}
-                  </kbd>
+                  {item.shortcut && (
+                    <kbd
+                      className="paperu-kbd paperu-nav__shortcut"
+                      aria-hidden="true"
+                    >
+                      {formatShortcut(item.shortcut)}
+                    </kbd>
+                  )}
                 </NavLink>
               </li>
             ))}
@@ -166,6 +189,15 @@ export function App(): React.ReactNode {
           <Outlet />
         </main>
       </div>
+
+      <Shelf />
+
+      {commandOpen && (
+        <CommandCenter
+          onNavigate={onCommandNavigate}
+          onClose={() => setCommandOpen(false)}
+        />
+      )}
 
       <PrivacyFooter />
     </div>

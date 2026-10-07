@@ -55,7 +55,11 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "jsdom",
+    // Use happy-dom instead of jsdom: jsdom 30 has a webidl
+    // incompatibility with vitest's VM pools
+    // ("webidl.util.markAsUncloneable is not a function").
+    environment: "happy-dom",
+    pool: "vmThreads",
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
