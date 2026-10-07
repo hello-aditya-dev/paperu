@@ -212,6 +212,10 @@ export function PdfSplitView(): React.ReactNode {
     setPageCount(null);
   }
 
+  // Hoisted outside the JSX so TypeScript does not narrow it inside the
+  // `state.kind === "ready"` block (rapid-click defense).
+  const isRunning = state.kind === "running";
+
   return (
     <section className="paperu-section" aria-labelledby="split-heading">
       <header className="paperu-section__header">
@@ -329,7 +333,7 @@ export function PdfSplitView(): React.ReactNode {
               <Button
                 variant="accent"
                 onClick={run}
-                disabled={mode === "extract" && !rangeText.trim()}
+                disabled={(mode === "extract" && !rangeText.trim()) || isRunning}
                 style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}
               >
                 {mode === "extract" ? "Extract pages" : "Split every page"}

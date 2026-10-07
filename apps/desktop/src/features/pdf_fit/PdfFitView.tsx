@@ -190,6 +190,10 @@ export function PdfFitView(): React.ReactNode {
     setTarget(null);
   }
 
+  // Hoisted outside the JSX so TypeScript does not narrow it inside the
+  // `state.kind === "ready"` block (rapid-click defense).
+  const isRunning = state.kind === "running";
+
   return (
     <section className="paperu-section" aria-labelledby="pdf-fit-heading">
       <header className="paperu-section__header">
@@ -295,7 +299,7 @@ export function PdfFitView(): React.ReactNode {
               <Button
                 variant="accent"
                 onClick={run}
-                disabled={!target}
+                disabled={!target || isRunning}
                 style={{ width: "100%" }}
               >
                 Make it fit

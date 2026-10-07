@@ -164,6 +164,10 @@ export function PdfToImagesView(): React.ReactNode {
     setRangeError(null);
   }
 
+  // Hoisted outside the JSX so TypeScript does not narrow it inside the
+  // `state.kind === "ready"` block (rapid-click defense).
+  const isRunning = state.kind === "running";
+
   return (
     <section className="paperu-section" aria-labelledby="p2i-heading">
       <header className="paperu-section__header">
@@ -268,7 +272,7 @@ export function PdfToImagesView(): React.ReactNode {
                 {rangeError && <p className="paperu-target__error">{rangeError}</p>}
               </div>
 
-              <Button variant="accent" onClick={run} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>
+              <Button variant="accent" onClick={run} disabled={isRunning} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>
                 Render to {format.toUpperCase()}
               </Button>
             </div>
