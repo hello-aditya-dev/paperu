@@ -193,10 +193,10 @@ These are expected from any mature desktop application.
 | Open file | Open output in default app | Implemented | 3 Rust tests |
 | Open folder | Reveal output in file manager | Implemented | 3 Rust tests |
 | Save As | Choose destination explicitly | Missing (pending capability) | — |
-| Recent files | Reopen previous work | Missing | — |
+| Recent files | Reopen previous work | Implemented (in-memory store) | — |
 | Undo/redo | Reverse last action | Missing | — |
 | Keyboard navigation | Use without mouse | Partial (nav rail ⌘1-9) | — |
-| Command palette | Search and run | Missing | — |
+| Command palette | Search and run | Planned (module registry exists) | 20 registry tests |
 | Settings | Configure preferences | Implemented (contract) | — |
 | Dark theme | Low-light mode | Implemented (design tokens) | — |
 | Reduced motion | Accessibility | Implemented (CSS) | — |
@@ -205,6 +205,84 @@ These are expected from any mature desktop application.
 | Non-destructive | Never modify original | Implemented (atomic_finalize) | 3 Rust tests |
 | Cancellation | Stop long operations | Implemented (AbortController) | — |
 | Progress | Real progress, not fake | Implemented (engine callbacks) | — |
+
+---
+
+## Student & Everyday capabilities (Wave B/C/D/E — future)
+
+These capabilities are defined in the Student/Notes/Everyday doctrine
+and are prioritized after Wave-1 is production-ready.
+
+### Assignment & Study
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Assignment Studio | Compile assignment pages into one PDF | Missing | Wave B |
+| Assignment Ready | Validate output against constraints | Missing | Wave B |
+| Portal Ready engine | Solve file constraints deterministically | Missing | Wave B |
+| Study Reader | Read PDFs with bookmarks/search/annotations | Missing | Wave C |
+| Study Packs | Organize study materials by subject | Missing | Wave C |
+| Citation Studio | Format citations (APA/MLA/Chicago/BibTeX) | Missing | Wave C |
+| Lecture Mode | Record audio/screen with bookmarks | Missing | Wave C |
+| PDF Notebook | Add blank/ruled/grid pages to PDFs | Missing | Wave E |
+
+### Notes
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Notes (core editing) | Rich text notes with formatting | Missing | Wave C |
+| Notes tables | Simple tables in notes | Missing | Wave C |
+| Notes checklists | Interactive checklists | Missing | Wave C |
+| Notes attachments | Attach files/images/PDFs to notes | Missing | Wave C |
+| Locked notes | Encrypt sensitive notes | Missing | Wave C |
+| Smart Folders | Deterministic note filtering | Missing | Wave C |
+| Quick Note | Global shortcut for fast capture | Missing | Wave C |
+| Notes version history | Restore earlier versions | Missing | Wave C |
+| Audio notes | Record audio into a note | Missing | Wave C |
+
+### Personal documents
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Application Kit | Store reusable personal documents | Missing | Wave B |
+| Forms Vault | Save reusable form information | Missing | Wave B |
+| Signature Vault | Store multiple signatures securely | Missing | Wave B |
+| Passport/Photo Studio | Exact-dimension photos with validation | Missing | Wave B |
+| Phone Scanner | Use phone as camera for desktop | Missing | Wave B |
+
+### Everyday file power
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Quick Look | Spacebar preview | Missing | Wave D |
+| Clipboard History | Local clipboard manager | Missing | Wave D |
+| Downloads Cleaner | Classify and clean downloads | Missing | Wave D |
+| Duplicate Finder | Find exact + similar duplicates | Missing | Wave D |
+| Rename Studio | Bulk rename with patterns | Missing | Wave D |
+| Folder Organizer | Rule-based file organization | Missing | Wave D |
+| Offline Converter | Format conversion graph | Missing | Wave D |
+| Archive Studio | Inspect/extract/create archives | Missing | Wave D |
+| File Inspector | Deep metadata inspection | Missing | Wave D |
+| File Rescue | Safe repair of damaged files | Missing | Wave D |
+
+### Print & Scan
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Print Studio+ | N-up, booklet, poster, grayscale | Missing | Wave E |
+| Exam Print Mode | Print lecture PDFs efficiently | Missing | Wave E |
+| Document Scanner | Crop/deskew/clean scanned docs | Missing | Wave E |
+| Webpage → Clean PDF | Convert web pages to PDF | Missing | Wave E |
+
+### Transfer & Automation
+
+| Capability | User problem | Paperu status | Wave |
+|---|---|---|---|
+| Paperu Send | Local file transfer (desktop ↔ phone) | Missing | Wave B |
+| Timer Jobs | Scheduled operations | Missing | Wave F |
+| Watch Folders | Auto-process new files | Missing | Wave F |
+| USB/Drive Toolbox | Copy/verify/checksum | Missing | Wave F |
+| Local Backup Recipes | Folder → drive backup | Missing | Wave F |
 
 ---
 
