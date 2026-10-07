@@ -14,6 +14,7 @@ import { SignPdfRoute } from "./SignPdfRoute";
 import { FillPdfRoute } from "./FillPdfRoute";
 import { AboutRoute } from "./AboutRoute";
 import { DiagnosticsRoute } from "./DiagnosticsRoute";
+import { HistoryRoute } from "./HistoryRoute";
 
 /**
  * Hash router: Tauri serves the frontend from the local bundle, so
@@ -37,6 +38,7 @@ export const router = createHashRouter([
       { path: "pdf/fill", element: <FillPdfRoute /> },
       { path: "about", element: <AboutRoute /> },
       { path: "diagnostics", element: <DiagnosticsRoute /> },
+      { path: "history", element: <HistoryRoute /> },
     ],
   },
 ]);

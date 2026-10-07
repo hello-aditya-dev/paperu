@@ -12,14 +12,17 @@
  */
 
 import type {
+  AddRecentWorkRequest,
   AppError,
   AppInfo,
   InspectFileResponse,
+  RecentWorkEntry,
   Settings,
   SettingsPatch,
 } from "@paperu/contracts";
 import {
   CommandName,
+  RecentWorkCommand,
   isAppError,
   appError as buildAppError,
   ErrorCategory,
@@ -274,6 +277,32 @@ export async function writeSettings(patch: SettingsPatch): Promise<Settings> {
 /** Read app identity/version. */
 export async function readAppInfo(): Promise<AppInfo> {
   return call<AppInfo>(CommandName.ReadAppInfo);
+}
+
+// ── Recent work (persistent history) ──────────────────────────────
+
+/** Add a new recent-work entry. Returns the inserted entry. */
+export async function addRecentWork(
+  request: AddRecentWorkRequest,
+): Promise<RecentWorkEntry> {
+  return call<RecentWorkEntry>(RecentWorkCommand.Add, { request });
+}
+
+/** List recent-work entries, most-recent-first. */
+export async function listRecentWork(
+  limit: number = 50,
+): Promise<RecentWorkEntry[]> {
+  return call<RecentWorkEntry[]>(RecentWorkCommand.List, { limit });
+}
+
+/** Remove a single recent-work entry by id. */
+export async function removeRecentWork(id: string): Promise<void> {
+  await call<null>(RecentWorkCommand.Remove, { id });
+}
+
+/** Clear all recent-work entries. */
+export async function clearRecentWork(): Promise<void> {
+  await call<null>(RecentWorkCommand.Clear);
 }
 
 // ── Core call ────────────────────────────────────────────────────

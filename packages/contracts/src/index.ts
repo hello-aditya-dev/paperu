@@ -12,6 +12,7 @@
 export * from "./common.js";
 export * from "./errors.js";
 export * from "./inspect.js";
+export * from "./recent_work.js";
 export * from "./tasks.js";
 export * from "./operations.js";
 export * from "./progress.js";
