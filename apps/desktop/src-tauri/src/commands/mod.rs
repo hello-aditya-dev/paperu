@@ -16,12 +16,14 @@ pub mod inspect;
 pub mod read_file;
 #[cfg(feature = "tauri-runtime")]
 pub mod settings;
+pub mod shell;
 
 pub use finalize::*;
 pub use inspect::*;
 pub use read_file::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
+pub use shell::*;
 
 use serde::Serialize;
 

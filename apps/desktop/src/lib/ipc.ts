@@ -198,6 +198,23 @@ function base64ToBytes(s: string): Uint8Array {
   return out.slice(0, outIdx);
 }
 
+// ── reveal_path / open_path (Builder-added commands) ──────────────
+
+/**
+ * Reveal a file in the platform file manager (Explorer on Windows,
+ * Finder on macOS, xdg-open on Linux). The file must exist.
+ */
+export async function revealPath(path: string): Promise<void> {
+  await call<void>("reveal_path", { request: { path } });
+}
+
+/**
+ * Open a file with the platform default application.
+ */
+export async function openPath(path: string): Promise<void> {
+  await call<void>("open_path", { request: { path } });
+}
+
 /**
  * Inspect multiple local files. Returns one result per path, preserving
  * order. Each file is inspected independently; a failure on one file does

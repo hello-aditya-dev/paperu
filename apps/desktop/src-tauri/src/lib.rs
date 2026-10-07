@@ -71,6 +71,7 @@ mod runtime {
     use crate::commands::read_app_info;
     use crate::commands::read_file::read_file_bytes;
     use crate::commands::settings::{read_settings, write_settings};
+    use crate::commands::shell::{open_path, reveal_path};
     use crate::state::AppState;
     use tauri::Manager;
 
@@ -125,6 +126,8 @@ mod runtime {
                 inspect_file,
                 finalize_output,
                 read_file_bytes,
+                reveal_path,
+                open_path,
                 read_settings,
                 write_settings,
                 read_app_info,

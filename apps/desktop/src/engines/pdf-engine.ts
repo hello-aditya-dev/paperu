@@ -239,6 +239,14 @@ export async function fitPdfToSize(
   strategy = `rasterize-jpeg q=${chosen.quality.toFixed(2)} scale=${chosen.scale}`;
   onProgress?.({ fraction: 1, stage: requirementMet ? "Done" : "Lowest safe result" });
 
+  // Validate the output PDF before declaring success (doctrine §47).
+  const validation = await validatePdfBytes(chosen.bytes);
+  if (!validation.valid) {
+    throw new Error(
+      `Paperu produced an invalid PDF after compression: ${validation.error}`,
+    );
+  }
+
   return {
     bytes: chosen.bytes,
     originalSize,
@@ -753,3 +761,58 @@ export async function renderPdfPage(
     scale,
   };
 }
+
+// ── Output validation ─────────────────────────────────────────────
+// Doctrine §47: never equate "processing function returned" with
+// "valid output." Validate outputs before declaring success.
+
+export interface PdfValidationResult {
+  valid: boolean;
+  pageCount: number;
+  error?: string;
+}
+
+/**
+ * Validate that a byte array is a well-formed PDF that pdf-lib can
+ * parse. Returns the page count on success. Used after every PDF
+ * engine operation to verify the output is not corrupted.
+ */
+export async function validatePdfBytes(
+  bytes: Uint8Array,
+): Promise<PdfValidationResult> {
+  try {
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+    return { valid: true, pageCount: doc.getPageCount() };
+  } catch (e) {
+    return {
+      valid: false,
+      pageCount: 0,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
+/**
+ * Validate that a byte array decodes as an image. Uses createImageBitmap
+ * which is available in the Tauri webview. Returns dimensions on success.
+ */
+export async function validateImageBytes(
+  bytes: Uint8Array,
+): Promise<{ valid: boolean; width: number; height: number; error?: string }> {
+  try {
+    const blob = new Blob([bytes.slice()], { type: "application/octet-stream" });
+    const bmp = await createImageBitmap(blob);
+    const w = bmp.width;
+    const h = bmp.height;
+    bmp.close?.();
+    return { valid: true, width: w, height: h };
+  } catch (e) {
+    return {
+      valid: false,
+      width: 0,
+      height: 0,
+      error: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
