@@ -173,8 +173,8 @@ export function ImageFitView(): React.ReactNode {
   return (
     <section className="paperu-section" aria-labelledby="image-fit-heading">
       <header className="paperu-section__header">
-        <h1 id="image-fit-heading">Make an image fit</h1>
-        <p className="paperu-section__lead">
+        <h1 id="image-fit-heading" className="paperu-text-display">Make an image fit</h1>
+        <p className="paperu-text-lead">
           Set a target. Paperu binary-searches quality and resolution to fit
           the limit. PNG transparency is preserved. Real bytes. No uploads.
         </p>

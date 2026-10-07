@@ -131,9 +131,9 @@ export function UniversalDrop(): React.ReactNode {
   return (
     <section className="paperu-drop" aria-labelledby="drop-heading">
       <header className="paperu-drop__header">
-        <p className="paperu-drop__eyebrow">Stop uploading your files to random websites.</p>
-        <h1 id="drop-heading">What do you need to do?</h1>
-        <p className="paperu-drop__lead">
+        <p className="paperu-text-eyebrow">Stop uploading your files to random websites.</p>
+        <h1 id="drop-heading" className="paperu-text-display">What do you need to do?</h1>
+        <p className="paperu-text-lead">
           Drop anything onto this window. Paperu inspects it on this PC, then
           suggests the right tool. Nothing is uploaded — ever.
         </p>
