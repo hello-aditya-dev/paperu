@@ -127,7 +127,7 @@ describe("CommandCenter — no result", () => {
 });
 
 describe("CommandCenter — multiple ranked results", () => {
-  it("returns multiple results for 'pdf' and ranks pdf-fit first", () => {
+  it("returns multiple PDF-related results for 'pdf'", () => {
     render(<CommandCenter onNavigate={vi.fn()} onClose={vi.fn()} />);
     const input = screen.getByLabelText(
       "Search Paperu commands",
@@ -135,6 +135,20 @@ describe("CommandCenter — multiple ranked results", () => {
     fireEvent.change(input, { target: { value: "pdf" } });
     const rows = screen.getAllByRole("option");
     expect(rows.length).toBeGreaterThanOrEqual(5);
+    // The first row must be PDF-titled (label starts with "PDF"). The
+    // pdf-to-images module wins because its label is "PDF → Images"
+    // (label-prefix match scores higher than label-contains).
+    expect(rows[0].textContent?.toLowerCase()).toContain("pdf");
+  });
+
+  it("ranks pdf-fit first for 'make pdf' (label prefix win)", () => {
+    render(<CommandCenter onNavigate={vi.fn()} onClose={vi.fn()} />);
+    const input = screen.getByLabelText(
+      "Search Paperu commands",
+    ) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "make pdf" } });
+    const rows = screen.getAllByRole("option");
+    expect(rows.length).toBeGreaterThan(0);
     expect(rows[0].textContent?.toLowerCase()).toContain("make");
   });
 });

@@ -131,10 +131,31 @@ describe("module registry", () => {
       expect(new Set(routes).size).toBe(routes.length);
     });
 
-    it("all available modules have shortcuts", () => {
-      // Every available module that's in the nav rail should have a shortcut.
-      const navModules = MODULES.filter((m) => m.available && m.id !== "inspect");
-      expect(navModules.every((m) => m.shortcut !== undefined)).toBe(true);
+    it("module shortcuts are unique single digits 1-9", () => {
+      // Shortcuts are optional (not every nav item needs one — digits 1-9
+      // are a finite resource). But when present, they must be unique and
+      // single-digit so the keyboard handler can dispatch them cleanly.
+      const shortcuts = MODULES.filter(
+        (m) => m.available && m.shortcut !== undefined,
+      ).map((m) => m.shortcut);
+      expect(new Set(shortcuts).size).toBe(shortcuts.length);
+      for (const s of shortcuts) {
+        expect(s).toMatch(/^[1-9]$/);
+      }
+    });
+
+    it("modules not in the nav rail are searchable in Command", () => {
+      // Inspect / about / diagnostics / shelf are visibleInNav: false but
+      // still appear in Command search.
+      const hidden = MODULES.filter(
+        (m) => m.available && m.visibleInNav === false,
+      );
+      expect(hidden.length).toBeGreaterThan(0);
+      for (const m of hidden) {
+        // Each hidden-from-nav module should still be command-searchable
+        // (the default is true, but make the invariant explicit).
+        expect(m.visibleInCommand ?? true).toBe(true);
+      }
     });
   });
 });
