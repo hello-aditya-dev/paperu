@@ -6,36 +6,13 @@
 //! returns the result as base64 so the frontend can pass it straight to
 //! finalize_output. Source-safety §22: the original file is never
 //! modified; the engine works on an in-memory copy.
+//!
+//! The base64 encoder lives in `crate::pdf_native` (non-gated, unit-tested)
+//! so its index-type correctness is verified on Linux CI, not only on
+//! Windows CI where this gated module is compiled.
 
 use crate::errors::Result;
 use crate::pdf_native;
-
-const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-fn bytes_to_base64(bytes: &[u8]) -> String {
-    let mut s = String::with_capacity((bytes.len() + 2) / 3 * 4);
-    let len = bytes.len();
-    let mut i = 0;
-    while i < len {
-        let b0 = bytes[i];
-        let b1 = if i + 1 < len { bytes[i + 1] } else { 0 };
-        let b2 = if i + 2 < len { bytes[i + 2] } else { 0 };
-        s.push(B64[(b0 >> 2) as usize] as char);
-        s.push(B64[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
-        s.push(if i + 1 < len {
-            B64[((b1 & 0x0f) << 2) | (b2 >> 6)] as char
-        } else {
-            '='
-        });
-        s.push(if i + 2 < len {
-            B64[(b2 & 0x3f) as usize] as char
-        } else {
-            '='
-        });
-        i += 3;
-    }
-    s
-}
 
 fn read_source(path: &str) -> Result<Vec<u8>> {
     std::fs::read(path).map_err(|e| {
@@ -61,7 +38,7 @@ impl PdfNativeResponse {
     fn from_bytes(bytes: Vec<u8>) -> Self {
         let page_count = pdf_native::page_count(&bytes);
         PdfNativeResponse {
-            bytes_base64: bytes_to_base64(&bytes),
+            bytes_base64: pdf_native::bytes_to_base64(&bytes),
             page_count,
         }
     }

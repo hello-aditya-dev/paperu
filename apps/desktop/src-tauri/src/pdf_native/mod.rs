@@ -146,6 +146,38 @@ fn save_doc_to_bytes(doc: Document) -> Result<Vec<u8>> {
 #[allow(dead_code)]
 fn _trait_bounds(_id: ObjectId, _o: &Object) {}
 
+// ── base64 encoding (for the Tauri command responses) ─────────────
+// Lives here (non-gated) so it's unit-testable on Linux without
+// tauri-runtime — the commands/*.rs files are only compiled on Windows CI.
+
+const B64: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// Encode a byte slice as a base64 string (standard alphabet + padding).
+pub fn bytes_to_base64(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    let len = bytes.len();
+    let mut i = 0;
+    while i < len {
+        let b0 = bytes[i];
+        let b1 = if i + 1 < len { bytes[i + 1] } else { 0 };
+        let b2 = if i + 2 < len { bytes[i + 2] } else { 0 };
+        s.push(B64[(b0 >> 2) as usize] as char);
+        s.push(B64[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        s.push(if i + 1 < len {
+            B64[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char
+        } else {
+            '='
+        });
+        s.push(if i + 2 < len {
+            B64[(b2 & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+        i += 3;
+    }
+    s
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -312,5 +344,19 @@ mod tests {
     fn operations_on_empty_bytes_fail_gracefully() {
         assert!(load_doc(&[]).is_err());
         assert_eq!(page_count(&[]), 0);
+    }
+
+    #[test]
+    fn bytes_to_base64_encodes_correctly() {
+        // Empty → empty.
+        assert_eq!(bytes_to_base64(&[]), "");
+        // "Man" → "TWFu" (the canonical base64 example).
+        assert_eq!(bytes_to_base64(b"Man"), "TWFu");
+        // "M" → "TQ==" (one byte → padded).
+        assert_eq!(bytes_to_base64(b"M"), "TQ==");
+        // "Ma" → "TWE=" (two bytes → one pad).
+        assert_eq!(bytes_to_base64(b"Ma"), "TWE=");
+        // Round-trip a 3-byte block.
+        assert_eq!(bytes_to_base64(b"abc"), "YWJj");
     }
 }
