@@ -178,8 +178,8 @@ export function PdfFitView(): React.ReactNode {
   return (
     <section className="paperu-section" aria-labelledby="pdf-fit-heading">
       <header className="paperu-section__header">
-        <h1 id="pdf-fit-heading">Make a PDF fit</h1>
-        <p className="paperu-section__lead">
+        <h1 id="pdf-fit-heading" className="paperu-text-display">Make a PDF fit</h1>
+        <p className="paperu-text-lead">
           Set a target. Paperu iterates — lossless structural optimization
           first, then careful rasterization only when needed — until the file
           fits. Real bytes. No uploads.

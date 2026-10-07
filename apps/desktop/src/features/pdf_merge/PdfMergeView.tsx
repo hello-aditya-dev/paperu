@@ -154,8 +154,8 @@ export function PdfMergeView(): React.ReactNode {
   return (
     <section className="paperu-section" aria-labelledby="merge-heading">
       <header className="paperu-section__header">
-        <h1 id="merge-heading">Merge PDFs</h1>
-        <p className="paperu-section__lead">
+        <h1 id="merge-heading" className="paperu-text-display">Merge PDFs</h1>
+        <p className="paperu-text-lead">
           Combine multiple PDFs into one, in the order you choose. Originals
           are never touched. Merge is not compression — the result is a new
           file containing all pages.

@@ -1,0 +1,208 @@
+/* ════════════════════════════════════════════════════════════════
+ * Paperu — Typography System
+ *
+ * A deliberate, recognizable type system built on the Integrator-owned
+ * design tokens. Defines semantic text classes so every piece of text
+ * in Paperu has an intentional role, not an ad-hoc style.
+ *
+ * Hierarchy:
+ *   display  — hero headlines (home, feature titles)
+ *   title    — page section titles
+ *   heading  — card and sub-section headings
+ *   body     — primary reading text
+ *   label    — uppercase field labels, metadata labels
+ *   caption  — small helper text, hints
+ *   numeric  — file sizes, dimensions, byte counts (tabular numerals)
+ *   metadata — key/value pairs in result cards
+ *   button   — button labels
+ *   input    — form field text
+ *   code     — paths, technical values, error codes
+ *
+ * Principles:
+ *   - Serif (Source Serif 4) for display/title/heading — editorial, premium.
+ *   - Sans (Inter) for body/label/caption/button/input — readable UI.
+ *   - Mono (JetBrains Mono) for code/numeric — precise, tabular.
+ *   - Tabular numerals everywhere numbers matter (sizes, counts, metrics).
+ *   - No layout shift from font loading (system fallbacks match metrics).
+ * ════════════════════════════════════════════════════════════════ */
+
+/* ── Display: hero headlines ────────────────────────────────────── */
+.paperu-text-display {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-2xl);
+  font-weight: var(--paperu-weight-semibold);
+  line-height: var(--paperu-leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--paperu-text);
+  margin: 0;
+}
+
+/* ── Title: page section titles ─────────────────────────────────── */
+.paperu-text-title {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-xl);
+  font-weight: var(--paperu-weight-semibold);
+  line-height: var(--paperu-leading-tight);
+  letter-spacing: -0.005em;
+  color: var(--paperu-text);
+  margin: 0;
+}
+
+/* ── Heading: card and sub-section headings ─────────────────────── */
+.paperu-text-heading {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-md);
+  font-weight: var(--paperu-weight-semibold);
+  line-height: var(--paperu-leading-tight);
+  color: var(--paperu-text);
+  margin: 0;
+}
+
+/* ── Body: primary reading text ─────────────────────────────────── */
+.paperu-text-body {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  font-weight: var(--paperu-weight-normal);
+  line-height: var(--paperu-leading-normal);
+  color: var(--paperu-text-muted);
+  margin: 0;
+}
+
+/* ── Lead: introductory paragraph under a title ─────────────────── */
+.paperu-text-lead {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-base);
+  font-weight: var(--paperu-weight-normal);
+  line-height: var(--paperu-leading-relaxed);
+  color: var(--paperu-text-muted);
+  max-width: 60ch;
+  margin: var(--paperu-space-2) 0 0;
+}
+
+/* ── Label: uppercase field labels, metadata labels ─────────────── */
+.paperu-text-label {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-semibold);
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paperu-text-subtle);
+  margin: 0;
+}
+
+/* ── Caption: small helper text, hints ──────────────────────────── */
+.paperu-text-caption {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-normal);
+  line-height: 1.4;
+  color: var(--paperu-text-subtle);
+  margin: 0;
+}
+
+/* ── Numeric: file sizes, dimensions, byte counts ───────────────── */
+.paperu-text-numeric {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-sm);
+  font-weight: var(--paperu-weight-normal);
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  color: var(--paperu-text);
+}
+
+/* ── Numeric large: result card stat values ─────────────────────── */
+.paperu-text-numeric-lg {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-lg);
+  font-weight: var(--paperu-weight-semibold);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--paperu-text);
+}
+
+/* ── Metadata: key/value pairs in result cards ──────────────────── */
+.paperu-text-metadata-key {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--paperu-text-subtle);
+  margin: 0;
+}
+
+.paperu-text-metadata-value {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-normal);
+  font-variant-numeric: tabular-nums;
+  color: var(--paperu-text-muted);
+  margin: 0;
+}
+
+/* ── Button: button labels ──────────────────────────────────────── */
+/* (Applied via .paperu-btn in ui/styles.css; documented here for
+ * completeness. Button text uses sans, medium weight, sm size.) */
+
+/* ── Input: form field text ─────────────────────────────────────── */
+.paperu-text-input {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-sm);
+  font-weight: var(--paperu-weight-normal);
+  line-height: 1.4;
+  color: var(--paperu-text);
+}
+
+/* ── Code: paths, technical values, error codes ─────────────────── */
+.paperu-text-code {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-normal);
+  line-height: 1.4;
+  color: var(--paperu-text-muted);
+  background: var(--paperu-surface-muted);
+  padding: 1px var(--paperu-space-2);
+  border-radius: var(--paperu-radius-xs);
+  word-break: break-all;
+}
+
+/* ── Eyebrow: small accent label above a display title ──────────── */
+.paperu-text-eyebrow {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--paperu-accent);
+  margin: 0;
+}
+
+/* ── Stamp: small label badges (LOCAL, DONE, etc.) ──────────────── */
+.paperu-text-stamp {
+  font-family: var(--paperu-font-mono);
+  font-size: 0.6875rem;
+  font-weight: var(--paperu-weight-normal);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ── Accent variants ────────────────────────────────────────────── */
+.paperu-text-accent { color: var(--paperu-accent); }
+.paperu-text-success { color: var(--paperu-success); }
+.paperu-text-destructive { color: var(--paperu-destructive); }
+.paperu-text-muted { color: var(--paperu-text-muted); }
+.paperu-text-subtle { color: var(--paperu-text-subtle); }
+
+/* ── Truncation helpers ─────────────────────────────────────────── */
+.paperu-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.paperu-break-all {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}

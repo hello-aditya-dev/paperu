@@ -1,7 +1,9 @@
 /* Paperu — global stylesheet.
- * Imports design tokens, UI primitives, and base element styling. */
+ * Imports design tokens, UI primitives, typography system, and base
+ * element styling. */
 @import "@paperu/design-tokens/tokens.css";
 @import "@paperu/ui/styles.css";
+@import "./typography.css";
 
 *,
 *::before,
@@ -48,12 +50,19 @@ h3 {
   flex-direction: column;
   min-height: 100vh;
 }
+.paperu-shell__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+}
 .paperu-shell__main {
   flex: 1 1 auto;
   width: 100%;
-  max-width: var(--paperu-app-max-width);
+  max-width: calc(var(--paperu-app-max-width) - var(--paperu-rail-width));
   margin: 0 auto;
   padding: var(--paperu-space-6) var(--paperu-space-5);
+  min-width: 0;
 }
 .paperu-shell__footer {
   flex-shrink: 0;

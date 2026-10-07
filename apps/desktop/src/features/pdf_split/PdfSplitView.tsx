@@ -184,8 +184,8 @@ export function PdfSplitView(): React.ReactNode {
   return (
     <section className="paperu-section" aria-labelledby="split-heading">
       <header className="paperu-section__header">
-        <h1 id="split-heading">Split / Extract</h1>
-        <p className="paperu-section__lead">
+        <h1 id="split-heading" className="paperu-text-display">Split / Extract</h1>
+        <p className="paperu-text-lead">
           Extract selected pages by range, or split a PDF into one file per
           page. Ranges are validated strictly — invalid input is rejected,
           never silently ignored.
