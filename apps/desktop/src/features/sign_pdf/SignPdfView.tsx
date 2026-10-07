@@ -145,6 +145,16 @@ export function SignPdfView(): React.ReactNode {
     return () => { cancelled = true; };
   }, [sigPng]);
 
+  // Manage the signature preview object URL — revoke on change/unmount
+  // to prevent memory leaks (doctrine §43).
+  const [sigPreviewUrl, setSigPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sigPng) { setSigPreviewUrl(null); return; }
+    const url = URL.createObjectURL(new Blob([sigPng.slice()], { type: "image/png" }));
+    setSigPreviewUrl(url);
+    return () => { URL.revokeObjectURL(url); };
+  }, [sigPng]);
+
   const heightPt = sigDims ? (widthPt * sigDims.h) / sigDims.w : widthPt * 0.4;
 
   function onPageClick(e: React.MouseEvent<HTMLDivElement>): void {
@@ -324,7 +334,7 @@ export function SignPdfView(): React.ReactNode {
                         }}
                       >
                         <img
-                          src={URL.createObjectURL(new Blob([sigPng.slice()], { type: "image/png" }))}
+                          src={sigPreviewUrl ?? undefined}
                           alt="Signature placement"
                           style={{ width: "100%", height: "100%", objectFit: "contain", opacity: 0.9 }}
                         />
