@@ -27,15 +27,15 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Print Studio | USEFUL | yes | ✅ native paths + AbortController | ✅ | — | — | ✅ | grayscale, passport sheets |
 | Study Reader | WORKING | yes | ✅ true fit-width (real container/page calc + resize recalc) | ✅ | ✅ SQLite | — | ✅ | search, bookmarks, annotations |
 | PDF Notebook | SHELL | no | ✅ stub | — | — | — | — | page templates, export |
-| PDF Metadata | FOUNDATION | no | — | ✅ pdf_info | — | ✅ | ✅ | inspect/edit/remove |
+| PDF Metadata / privacy | USEFUL | yes | ✅ pdf-page-ops inspect+remove | ✅ lopdf (Info dict) | — | ✅ Rust (metadata tests) | ✅ | edit (currently inspect+remove only) |
 | PDF Annotations | ABSENT | no | — | — | — | — | — | text, highlight, shapes, comments |
 | PDF Redaction | ABSENT | no | — | — | — | — | — | genuine destructive redaction |
 | PDF Password | ABSENT | no | — | — | — | — | — | encrypt/decrypt |
 | PDF Watermark | ABSENT | no | — | — | — | — | — | text/opacity/placement |
-| PDF Page Numbers | ABSENT | no | — | — | — | — | — | bottom center/right, start value |
+| PDF Page Numbers | FOUNDATION | yes (Assignment Studio) | ✅ cover/page-numbers/target-size | ✅ pdf-lib drawText | — | — | ✅ | standalone reusable tool, page ranges |
 | PDF Rotate | USEFUL | yes | ✅ pdf-page-ops (90/180/270, all or selected) | ✅ lopdf (MIT) | — | ✅ Rust (9 pdf_native tests) | ✅ | per-page rotate |
 | PDF Crop | ABSENT | no | — | — | — | — | — | page-level crop |
-| PDF Reorder | ABSENT | no | — | — | — | — | — | drag-reorder pages (needs page-tree rebuild) |
+| PDF Reorder / Reverse | USEFUL | yes | ✅ pdf-page-ops reorder/reverse | ✅ lopdf (page-tree Kids rebuild, permutation validation) | — | ✅ Rust (reorder + reverse tests) | ✅ | drag-reorder UI (current: text list) |
 
 ## Image + Metadata/Privacy
 | Feature | Status | Available | Frontend | Backend | Tests | Windows Compile | Remaining |
@@ -47,8 +47,8 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Convert | USEFUL | yes (Image Toolbox) | ✅ PNG/JPEG/WebP | ✅ Canvas | — | ✅ | — |
 | Metadata Inspect | USEFUL | yes (Image Toolbox) | ✅ real EXIF + GPS IFD | ✅ Canvas | ✅ detectJpegExifGps (9 tests) | ✅ | EXIF field detail |
 | EXIF/GPS Strip | USEFUL | yes (Image Toolbox) | ✅ truthful report | ✅ Canvas | ✅ | ✅ | — (truthful: reports only what was present) |
-| Watermark | ABSENT | no | — | — | — | — | text/opacity |
-| Brightness/Contrast | ABSENT | no | — | — | — | — | simple adjustments |
+| Image Watermark | USEFUL | yes (Image Toolbox) | ✅ text + opacity + size + 5 positions | ✅ Canvas | — | — | ✅ | image watermark |
+| Image Adjustments | USEFUL | yes (Image Toolbox) | ✅ brightness/contrast/saturation/grayscale/B&W | ✅ Canvas pixel manipulation | — | — | ✅ | presets, curves |
 
 ## Student / Application Workflows
 | Feature | Status | Available | Frontend | Backend | Persistence | Tests | Windows Compile | Remaining |
@@ -93,7 +93,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Local Backup Recipes | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | dry-run, run, verify |
 | Timer Jobs | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | schedule eval, execution history |
 | Watch Folders | FOUNDATION | yes | ✅ live event feed + start/stop | ✅ notify (CC0) + Paperu debounce | ✅ SQLite (rules schema) | ✅ Rust (5 watch tests) | ✅ | rule→recipe execution, history, failure reporting |
-| USB / Drive Toolbox | SHELL | no | ✅ stub | — | — | — | ✅ | copy+verify+checksum |
+| USB / Drive Toolbox | FOUNDATION | yes | ✅ stub route | ✅ copy_and_verify (SHA-256, cancel, conflict-safe) | — | ✅ Rust (4 copy_verify tests) | ✅ | wire route to copy_and_verify |
 
 ## Commercial / Platform
 | Feature | Status | Available | Remaining |
