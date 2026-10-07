@@ -168,6 +168,22 @@ mod runtime {
                 crate::commands::recent_work::list_recent_work,
                 crate::commands::recent_work::remove_recent_work,
                 crate::commands::recent_work::clear_recent_work,
+                crate::commands::rename::preview_rename,
+                crate::commands::rename::execute_rename,
+                crate::commands::citations::save_citation,
+                crate::commands::citations::list_citations,
+                crate::commands::citations::delete_citation,
+                crate::commands::citations::format_citation,
+                crate::commands::duplicate_finder::find_exact_duplicates,
+                crate::commands::downloads_cleaner::scan_downloads_folder,
+                crate::commands::organizer::save_organizer_rule,
+                crate::commands::organizer::list_organizer_rules,
+                crate::commands::organizer::delete_organizer_rule,
+                crate::commands::organizer::dry_run_organizer,
+                crate::commands::file_rescue::diagnose_file,
+                crate::commands::archive_studio::validate_zip_entry,
+                crate::commands::archive_studio::check_suspicious_ratio,
+                crate::commands::archive_studio::check_destination_contained,
             ])
             .run(tauri::generate_context!())
             .expect("Paperu failed to start");
