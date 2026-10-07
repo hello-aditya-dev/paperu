@@ -117,9 +117,11 @@ export const ShelfStore = create<ShelfState>((set) => ({
         return {};
       }
       const next = [...state.items];
-      const tmp = next[a];
-      next[a] = next[b];
-      next[b] = tmp;
+      const aItem = next[a];
+      const bItem = next[b];
+      if (aItem === undefined || bItem === undefined) return {};
+      next[a] = bItem;
+      next[b] = aItem;
       return { items: next };
     }),
 

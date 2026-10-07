@@ -26,7 +26,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { searchModules, type ModuleEntry } from "@/lib/module-registry";
+import { searchModules } from "@/lib/module-registry";
 import { useRecentFiles } from "@/lib/recent-files";
 
 export interface CommandCenterProps {

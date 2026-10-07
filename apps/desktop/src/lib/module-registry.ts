@@ -72,27 +72,10 @@ export interface ModuleEntry {
   readonly contextualPriority?: number;
 }
 
-/** Defaulting helper: fill in the optional mature-UX fields. */
-function withDefaults(m: ModuleEntry): ModuleEntry & {
-  glyph: string | undefined;
-  navOrder: number;
-  visibleInNav: boolean;
-  visibleInCommand: boolean;
-  pinnable: boolean;
-  usableAsNextAction: boolean;
-  contextualPriority: number;
-} {
-  return {
-    ...m,
-    glyph: m.glyph,
-    navOrder: m.navOrder ?? 100,
-    visibleInNav: m.visibleInNav ?? true,
-    visibleInCommand: m.visibleInCommand ?? true,
-    pinnable: m.pinnable ?? true,
-    usableAsNextAction: m.usableAsNextAction ?? m.inputKinds.length > 0,
-    contextualPriority: m.contextualPriority ?? 50,
-  };
-}
+/** Default values for the optional mature-UX fields. Centralized so
+ *  getNavModules/getCommandModules/etc. use identical defaults. */
+const DEFAULT_NAV_ORDER = 100;
+const DEFAULT_CONTEXTUAL_PRIORITY = 50;
 
 /**
  * The canonical Paperu module registry.
@@ -412,7 +395,7 @@ export function getAvailableModules(): readonly ModuleEntry[] {
 export function getNavModules(): readonly ModuleEntry[] {
   return getAvailableModules()
     .filter((m) => (m.visibleInNav ?? true))
-    .sort((a, b) => (a.navOrder ?? 100) - (b.navOrder ?? 100));
+    .sort((a, b) => (a.navOrder ?? DEFAULT_NAV_ORDER) - (b.navOrder ?? DEFAULT_NAV_ORDER));
 }
 
 /**
@@ -431,7 +414,7 @@ export function getModulesForKind(kind: InputKind): readonly ModuleEntry[] {
     .filter(
       (m) => m.inputKinds.includes(kind) || m.inputKinds.includes("any"),
     )
-    .sort((a, b) => (b.contextualPriority ?? 50) - (a.contextualPriority ?? 50));
+    .sort((a, b) => (b.contextualPriority ?? DEFAULT_CONTEXTUAL_PRIORITY) - (a.contextualPriority ?? DEFAULT_CONTEXTUAL_PRIORITY));
 }
 
 /**
@@ -458,7 +441,7 @@ export function getNextActionsForKind(
         m.usableAsNextAction !== false &&
         (m.inputKinds.includes(kind) || m.inputKinds.includes("any")),
     )
-    .sort((a, b) => (b.contextualPriority ?? 50) - (a.contextualPriority ?? 50));
+    .sort((a, b) => (b.contextualPriority ?? DEFAULT_CONTEXTUAL_PRIORITY) - (a.contextualPriority ?? DEFAULT_CONTEXTUAL_PRIORITY));
 }
 
 /** Normalize a query string: lowercase, collapse whitespace, trim. */
@@ -508,7 +491,7 @@ export function searchModules(query: string): readonly ModuleEntry[] {
   if (tokens.length === 0) {
     // Stable default ordering for empty query.
     return [...pool].sort(
-      (a, b) => (a.navOrder ?? 100) - (b.navOrder ?? 100),
+      (a, b) => (a.navOrder ?? DEFAULT_NAV_ORDER) - (b.navOrder ?? DEFAULT_NAV_ORDER),
     );
   }
   const results: { module: ModuleEntry; score: number }[] = [];
@@ -529,7 +512,7 @@ export function searchModules(query: string): readonly ModuleEntry[] {
   }
   results.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
-    return (a.module.navOrder ?? 100) - (b.module.navOrder ?? 100);
+    return (a.module.navOrder ?? DEFAULT_NAV_ORDER) - (b.module.navOrder ?? DEFAULT_NAV_ORDER);
   });
   return results.map((r) => r.module);
 }
@@ -549,7 +532,7 @@ export function getModulesInWorkspace(
 ): readonly ModuleEntry[] {
   return getAvailableModules()
     .filter((m) => m.workspace === workspace)
-    .sort((a, b) => (a.navOrder ?? 100) - (b.navOrder ?? 100));
+    .sort((a, b) => (a.navOrder ?? DEFAULT_NAV_ORDER) - (b.navOrder ?? DEFAULT_NAV_ORDER));
 }
 
 /**
