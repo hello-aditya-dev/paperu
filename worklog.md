@@ -241,3 +241,56 @@ Stage Summary:
   - Full Study Reader V1 (highlights/bookmarks/annotations/tabs) — §23
   - Single instance + open-file argument + window state — §33
   - Performance instrumentation — §64
+
+---
+Task ID: 6 — WINDOWS CI GREEN + REAL INSTALLER PRODUCED
+Agent: Builder (Z.ai Code)
+
+## CI run: 37661450596 — ALL GREEN ✓
+- Frontend (typecheck · lint · test · build): ✓ 48s
+- Rust core (fmt · clippy · test): ✓ 59s
+- Windows Tauri build: ✓ 12m25s (ALL steps passed including Tauri production build)
+
+## Windows artifacts produced (commit c482590):
+- NSIS installer: Paperu_0.1.0_x64-setup.exe — 2.67 MB
+  SHA-256: DCCEF1770FA0AAC7C2BEA85C786C8A3850496A86A4481E6D0E9E00C0E8302A69
+- MSI installer: Paperu_0.1.0_x64_en-US.msi — 3.4 MB
+  SHA-256: BFFFCF3AACF53A098E02E3533964B8B5F8C3991A4277F14156F0990547E392B7
+- Artifact zip: paperu-windows-x64-c482590c93ef0e4746fa9e5f20408d1e9edea6a0
+  Size: 9.03 MB (contains both installers + raw paperu.exe + SHA256SUMS.txt)
+  URL: https://github.com/hello-aditya-dev/paperu/actions/runs/37661450596
+
+## Signing status: UNSIGNED
+TAURI_SIGNING_PRIVATE_KEY="" in CI. No Authenticode certificate.
+This is a 'Windows Release Candidate — unsigned' — functional but
+will trigger Windows SmartScreen on first install. Production signing
+comes later when a certificate exists.
+
+## What was fixed to reach green (iterative per §8):
+1. fileDropEnabled → dragDropEnabled (Tauri 2 config)
+2. CI triggers: added agent/builder + agent/integration + agent/guardian + workflow_dispatch
+3. pnpm-lock.yaml drift (jsdom→happy-dom not reflected in lockfile)
+4. ERR_PNPM_IGNORED_BUILDS (canvas) → --ignore-scripts in CI install
+5. ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING → pool: threads (was vmThreads)
+6. generate_handler! macros → full module paths (was use-imported names)
+7. Unused imports in runtime module + shell.rs → removed / #[allow]
+
+## Local gates (final state):
+- TS typecheck: ✅ green
+- ESLint: ✅ green
+- TS tests: ✅ 110 tests pass
+- Rust core clippy: ✅ zero warnings
+- Rust fmt: ✅ clean
+- Rust tests: ✅ 47 tests pass
+
+## Still NOT done (honest):
+- Batch cancellation (AbortController) — §26
+- Notes autosave flush on close — §25
+- Real Fit Width in Reader — §22
+- Application Kit frontend completion (add/replace/rename) — §16
+- Full Notes rich editor — §24
+- Full Study Reader V1 (highlights/bookmarks/annotations/tabs) — §23
+- Single instance + open-file argument + window state — §33
+- Performance instrumentation — §64
+- Manual Windows smoke test (install + launch + use + close + reopen) — §28
+- Code signing (needs Authenticode certificate) — §13
