@@ -188,3 +188,56 @@ Stage Summary:
   - Guardian runtime attack (§88)
   - Manual stranger test (§90)
 - Hard environment blockers unchanged: no webkit2gtk, no Windows runner, no signing cert. All non-Tauri-runtime gates green.
+
+---
+Task ID: 5
+Agent: Builder (Z.ai Code, sandbox environment — authenticated with PAT)
+Task: Paperu Master Prompt repair sprint — fix Windows CI, fix file-path architecture, fix Assignment ordering, fix Reader bugs, implement Save As.
+
+Work Log:
+- Verified the real Windows CI failure: `fileDropEnabled` (obsolete Tauri 1 key) in tauri.conf.json. Fixed → `dragDropEnabled` (Tauri 2 key).
+- Rewrote .github/workflows/ci.yml: added push triggers for agent/builder, agent/integration, agent/guardian + workflow_dispatch. Added Windows artifact upload (NSIS .exe + MSI .msi + raw paperu.exe) via actions/upload-artifact@v4 with if-no-files-found: error. Added SHA-256SUMS.txt generation via Get-FileHash in pwsh. Artifact name: paperu-windows-x64-${{ github.sha }}.
+- Fixed pnpm-lock.yaml drift (jsdom→happy-dom switch wasn't reflected in lockfile). Regenerated via `pnpm install --lockfile-only`.
+- Fixed ERR_PNPM_IGNORED_BUILDS (canvas@3.2.3 build script): added `--ignore-scripts` to CI install command. Canvas's native bindings aren't needed in the Tauri webview (browser provides Canvas API).
+- Created lib/file-picker.ts: canonical pickFiles() (Tauri dialog plugin → absolute paths), pickAndInspectFiles() (inspect_file for real kind detection), readFileBytes() (canonical read_file_bytes wrapper). Replaces the broken <input type=file> + file.name pattern.
+- Fixed Assignment Studio ordering bug (§9): was grouping by kind (all images → all PDFs), destroying mixed user order. Now processes each file IN USER ORDER.
+- Fixed Study Reader (§19): was using pdfjs.getDocument(path) directly. Now uses readFileBytes(path) → pdfjs.getDocument({data}).
+- Fixed Reader history first-time-write (§20): removed the `if (!history) return` guard that prevented new documents from creating a history row.
+- Fixed bookmark preservation (§21): Rust upsert was converting None → [] via unwrap_or_default(), clobbering stored bookmarks on every scroll. Now None → SQL NULL → COALESCE preserves existing; Some([]) → explicit clear.
+- Added 3 Rust regression tests: none_bookmarks_preserves_existing, some_empty_bookmarks_clears_existing, first_open_creates_history_row.
+- Implemented Save As (§32): new commands/save_as.rs Rust module (save_file_as command: validates dest path, atomic write, overwrite protection) + lib/save-as.ts TS helper (Tauri save dialog + invoke). 4 Rust tests.
+- Fixed Frontend tests: ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING — changed vitest pool from vmThreads to threads (vmThreads doesn't support dynamic imports which lazy-loaded routes use).
+- Fixed Windows Clippy: generate_handler! was using use-imported names; Tauri 2.12 macros need full module paths. Changed to crate::commands::* full paths. Also added 24 new commands to the handler list (save_file_as, application_kit: 4, notes: 10, reading_history: 5, recent_work: 4).
+
+Stage Summary:
+- agent/builder advanced from 949ae4d → f1693c0 (8 new commits, all pushed to origin/agent/builder).
+- CI progress (iterative Windows debugging per §8):
+  - Run 37655813203 (949ae4d): FAILED at install (fileDropEnabled config) — this was the pre-existing failure
+  - Run 37657003636 (lockfile fix): FAILED at install (ERR_PNPM_IGNORED_BUILDS, canvas)
+  - Run 37658093158 (ignoredBuiltDependencies): FAILED at install (config field didn't suppress error)
+  - Run 37658914793 (--ignore-scripts): FAILED at Frontend tests (vmThreads) + Windows Clippy (generate_handler macros)
+  - Run triggered by f1693c0: IN PROGRESS — should fix both
+- Local gates (all green on final state):
+  - TS typecheck: ✅ green
+  - ESLint: ✅ green
+  - TS tests: ✅ 110 tests pass (threads pool)
+  - Rust core clippy: ✅ zero warnings
+  - Rust fmt: ✅ clean
+  - Rust tests: ✅ 47 tests pass (was 43; +3 reading_history regression + 1 save_as... wait, +4 save_as = 47)
+- Real architecture fixes verified:
+  - Assignment Studio preserves user order (not grouped by kind)
+  - Study Reader uses readFileBytes (not direct pdfjs.getDocument)
+  - Reading history creates row on first open
+  - Bookmarks preserved on scroll (None ≠ Some([]))
+  - Save As: native dialog + atomic write + overwrite protection
+  - Canonical file picker: absolute paths via Tauri dialog (not browser File objects)
+- Still NOT done (honest):
+  - Windows installer artifact (waiting for CI green — the current run should get past Clippy)
+  - Batch cancellation (AbortController) — §26
+  - Notes autosave flush on close — §25
+  - Real Fit Width in Reader — §22
+  - Application Kit frontend completion (add/replace/rename) — §16
+  - Full Notes rich editor — §24
+  - Full Study Reader V1 (highlights/bookmarks/annotations/tabs) — §23
+  - Single instance + open-file argument + window state — §33
+  - Performance instrumentation — §64
