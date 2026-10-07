@@ -17,7 +17,7 @@ Legend:
 |---|---|---|---|---|---|---|---|---|
 | ZIP create/extract/list | — | `zip` 2.4.2 (MIT) | — | — | zip-rs/zip2 | Standard pure-Rust ZIP crate; security guards reused from existing Paperu validation | Pure Rust, low risk | None (pure Rust, compiles on MSVC) |
 | PDF page ops (rotate/delete/reorder/extract) | — | `lopdf` (MIT) | — | — | J-F-Liu/lopdf | Rust-native PDF object model; unlocks 4 ABSENT features without C++ | Pure Rust, low risk | None |
-| Filesystem watching (Watch Folders) | — | `notify` (CC0) + `notify-debouncer-mini` (MIT/Apache) | — | — | notify-rs/notify | The standard Rust fs-watcher; CC0 core; cross-platform native (ReadDirectoryChangesW on Windows) | Thread + lifecycle management | None (pure Rust, uses OS APIs) |
+| Filesystem watching (Watch Folders) | — | `notify` (CC0) | — | — | notify-rs/notify | The standard Rust fs-watcher; CC0 core; cross-platform native (ReadDirectoryChangesW on Windows). Paperu implements its own 400ms path-dedupe debounce on top. | Thread + lifecycle management | None (pure Rust, uses OS APIs) |
 | PDF rendering | — | PDF.js (existing) | — | `pdfium-render` (MIT/Apache) studied | pdfium-render studied | PDF.js already works for Reader + Quick Look; pdfium binary bundling is high-cost for marginal V1 gain | Defer pdfium binary bundling | Defer |
 | PDF structure/security (encrypt/decrypt/linearize/repair) | — | — | — | `qpdf` (Apache-2.0) studied | qpdf/qpdf studied | C++ library; bundling requires compiling or shipping a binary. lopdf covers page ops; encryption deferred until justified | C++ build/bundle cost | Defer |
 | Heavy image processing | Canvas (existing) | — | — | `ImageMagick` (ImageMagick License) studied | ImageMagick studied | Canvas covers V1 (resize/crop/rotate/convert/strip); ImageMagick is a C library needing system install — high packaging burden for marginal V1 gain | C lib bundling | Defer |
@@ -31,7 +31,7 @@ Legend:
 **Direct dependencies added (Bucket A):**
 1. `zip` 2.4.2 (MIT) — Archive Studio create/extract/list ✓ DONE
 2. `lopdf` (MIT) — PDF page operations (rotate/delete/reorder/extract) — IN PROGRESS
-3. `notify` + `notify-debouncer-mini` (CC0/MIT/Apache) — Watch Folders — IN PROGRESS
+3. `notify` (CC0) — Watch Folders — DONE (Paperu implements its own debounce; notify-debouncer-mini was removed because it loses event kinds)
 
 **Permissive ports (Bucket B):** none (using published crates directly is preferred)
 

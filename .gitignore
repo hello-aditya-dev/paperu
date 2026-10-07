@@ -75,3 +75,6 @@ coverage/
 *.db-shm
 *.sqlite
 *.sqlite3
+
+# Never commit uploaded sandbox/chat conversation artifacts
+upload/

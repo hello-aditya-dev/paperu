@@ -6,6 +6,8 @@ export interface OrganizerRule {
   readonly conditionType: string;
   readonly conditionValue: string;
   readonly action: string;
+  /** Collision policy: "rename" (default, never overwrites) | "skip". */
+  readonly conflictPolicy?: string | null;
   readonly enabled?: boolean | null;
   readonly sortOrder?: number | null;
 }

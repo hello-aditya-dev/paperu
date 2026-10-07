@@ -95,6 +95,55 @@ pub fn remove(db: &Database, id: &str) -> Result<()> {
     })
 }
 
+/// Atomically replace an existing kit item's file reference (90% §7).
+///
+/// The previous `replace()` in the frontend was remove-then-add: if the
+/// second call failed, the old reference was lost. This performs a single
+/// UPDATE (inherently atomic — one statement, one transaction) that
+/// overwrites the file-reference fields while preserving the id + created_at.
+/// If the item doesn't exist, no row is touched + an error is returned.
+/// Failure leaves the original item unchanged.
+pub fn replace(
+    db: &Database,
+    id: &str,
+    req: AddApplicationKitItemRequest,
+) -> Result<ApplicationKitItem> {
+    db.with_conn(|conn| {
+        let now = now_iso(conn)?;
+        let changed = conn
+            .execute(
+                "UPDATE application_kit_item SET
+                kind = ?1, label = ?2, file_path = ?3, file_name = ?4,
+                file_kind = ?5, mime_type = ?6, size_bytes = ?7, notes = ?8,
+                updated_at = ?9
+             WHERE id = ?10",
+                params![
+                    req.kind,
+                    req.label,
+                    req.file_path,
+                    req.file_name,
+                    req.file_kind,
+                    req.mime_type,
+                    req.size_bytes,
+                    req.notes,
+                    now,
+                    id,
+                ],
+            )
+            .map_err(map_sqlite)?;
+        if changed == 0 {
+            return Err(AppError::builder(
+                code::FILE_NOT_FOUND,
+                ErrorCategory::Filesystem,
+                "That application-kit item wasn't found.",
+            )
+            .technical(format!("id={id}"))
+            .build());
+        }
+        read_row(conn, id)
+    })
+}
+
 // ── helpers ──────────────────────────────────────────────────────
 
 fn read_row(conn: &rusqlite::Connection, id: &str) -> Result<ApplicationKitItem> {
@@ -240,5 +289,42 @@ mod tests {
         assert_eq!(list(&db).unwrap().len(), 1);
         remove(&db, &item.id).unwrap();
         assert_eq!(list(&db).unwrap().len(), 0);
+    }
+
+    #[test]
+    fn replace_is_atomic_and_preserves_id() {
+        // 90% §7: replace overwrites the file reference in a single
+        // transactional UPDATE. The id + created_at are preserved; the
+        // file_path/label/notes are updated. No remove-then-add gap.
+        let db = fresh_db();
+        let original = add(&db, sample_request("MyPhoto", "photo")).unwrap();
+        let original_id = original.id.clone();
+        let mut new_req = sample_request("MyPhoto", "photo");
+        new_req.label = "MyPhoto v2".to_string();
+        new_req.file_path = "/new/path/photo.jpg".to_string();
+        new_req.notes = Some("replaced".to_string());
+        let replaced = replace(&db, &original.id, new_req).unwrap();
+        // The id is preserved (no remove-then-add creating a new id).
+        assert_eq!(replaced.id, original_id, "replace preserves the id");
+        // The fields are updated.
+        assert_eq!(replaced.label, "MyPhoto v2");
+        assert_eq!(replaced.file_path, "/new/path/photo.jpg");
+        assert_eq!(replaced.notes.as_deref(), Some("replaced"));
+        // Only one row exists (no orphan from a remove-then-add).
+        assert_eq!(list(&db).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn replace_nonexistent_id_returns_error_and_touches_nothing() {
+        // 90% §7: replacing a nonexistent id returns an error + does NOT
+        // create a row. (Failure leaves the original state unchanged.)
+        let db = fresh_db();
+        let result = replace(&db, "nonexistent-id", sample_request("Ghost", "other"));
+        assert!(result.is_err(), "replace must error on a missing id");
+        assert_eq!(
+            list(&db).unwrap().len(),
+            0,
+            "no row created on failed replace"
+        );
     }
 }

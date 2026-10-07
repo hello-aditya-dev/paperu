@@ -10,10 +10,12 @@
 //!   atomically → report success
 //! A failed operation must never destroy or corrupt the source.
 
+pub mod conflict;
 pub mod inspect;
 pub mod paths;
 pub mod temp;
 
+pub use conflict::*;
 pub use inspect::*;
 pub use paths::*;
 pub use temp::*;

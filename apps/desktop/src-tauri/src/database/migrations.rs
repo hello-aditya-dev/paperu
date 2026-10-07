@@ -51,10 +51,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "feature_expansion",
         sql: include_str!("../../migrations/0006_feature_expansion.sql"),
     },
+    Migration {
+        version: 7,
+        label: "organizer_conflict_policy",
+        sql: include_str!("../../migrations/0007_organizer_conflict_policy.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 6;
+pub const LATEST_VERSION: u32 = 7;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {

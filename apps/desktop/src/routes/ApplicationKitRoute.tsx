@@ -37,6 +37,7 @@ import {
   listApplicationKitItems,
   openPath,
   removeApplicationKitItem,
+  replaceApplicationKitItem,
   revealPath,
   updateApplicationKitItem,
 } from "@/lib/ipc";
@@ -209,10 +210,10 @@ export function ApplicationKitRoute(): React.ReactNode {
       });
       if (typeof selected !== "string" || selected.length === 0) return;
       const meta = await inspectFile(selected);
-      // Replace = remove old + add new, preserving the label + notes
-      // across the swap (the Update contract doesn't expose filePath).
-      await removeApplicationKitItem(item.id);
-      await addApplicationKitItem({
+      // ATOMIC REPLACE (90% §7): a single transactional UPDATE replaces
+      // the file reference + preserves the id. No remove-then-add gap —
+      // if this fails, the original item is unchanged.
+      await replaceApplicationKitItem(item.id, {
         kind: item.kind,
         label: item.label,
         filePath: meta.path,

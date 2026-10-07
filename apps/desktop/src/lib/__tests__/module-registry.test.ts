@@ -158,4 +158,42 @@ describe("module registry", () => {
       }
     });
   });
+
+  // 90% §8: registry truth — available modules must agree with the feature
+  // inventory + every available module must have a real, non-empty route.
+  describe("registry truth (90% §8)", () => {
+    it("every available module has a real route starting with / or #", () => {
+      const available = getAvailableModules();
+      expect(available.length).toBeGreaterThan(0);
+      for (const m of available) {
+        // "/" routes are real pages; "#" routes are in-app panels (e.g. shelf).
+        expect(m.route).toMatch(/^[/#]/);
+        expect(m.route.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("available module routes are unique", () => {
+      const routes = getAvailableModules().map((m) => m.route);
+      expect(new Set(routes).size).toBe(routes.length);
+    });
+
+    it("archive-studio is available (registry ↔ inventory agreement)", () => {
+      const m = getModule("archive-studio");
+      expect(m).toBeDefined();
+      expect(m!.available).toBe(true);
+    });
+
+    it("watch-folders is available (registry ↔ inventory agreement)", () => {
+      const m = getModule("watch-folders");
+      expect(m).toBeDefined();
+      expect(m!.available).toBe(true);
+    });
+
+    it("study-reader is available + resolves to /reader", () => {
+      const m = getModule("study-reader");
+      expect(m).toBeDefined();
+      expect(m!.available).toBe(true);
+      expect(m!.route).toBe("/reader");
+    });
+  });
 });

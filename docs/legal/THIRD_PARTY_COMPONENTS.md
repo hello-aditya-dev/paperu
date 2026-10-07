@@ -34,8 +34,8 @@ Per master prompt §6: provenance for every external component used by Paperu.
 - **Upstream:** notify-rs/notify (https://github.com/notify-rs/notify)
 - **Upstream commit:** e455a21 (shallow clone, 2026-10-07)
 - **Version:** latest on crates.io
-- **Licence:** CC0-1.0 (core, public domain) + MIT OR Apache-2.0 (notify-types, notify-debouncer-mini)
-- **Integration method:** Cargo dependency (`notify` + `notify-debouncer-mini`)
+- **Licence:** CC0-1.0 (core, public domain) + MIT OR Apache-2.0 (notify-types)
+- **Integration method:** Cargo dependency (`notify` only; Paperu implements its own 400ms path-dedupe debounce on top — notify-debouncer-mini was evaluated but removed because it collapses event kinds to Any/AnyContinuous, losing the create/modify/remove distinction the UX needs)
 - **Paperu files affected:** `apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/src/watch/mod.rs`, `apps/desktop/src-tauri/src/commands/watch.rs`
 - **Code copied?** No — used as a published dependency
 - **Redistribution requirements:** CC0 requires no notice (public domain); MIT/Apache helpers require notice

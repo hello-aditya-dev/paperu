@@ -10,7 +10,7 @@ keywords = ["paperu", "desktop", "file-workspace", "local-first", "tauri"]
 categories = ["filesystem", "development-tools"]
 default-run = "paperu"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.88"
 
 # ── Library (used by Tauri build + integration tests) ─────────────
 [lib]

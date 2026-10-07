@@ -96,6 +96,14 @@ pub fn is_suspicious_ratio(uncompressed: u64, compressed: u64) -> bool {
     ratio > 100.0
 }
 
+/// Hard resource ceilings for ZIP extraction (decompression-bomb + zip-bomb
+/// protection, 90% §5). An archive/entry that exceeds ANY of these is
+/// rejected or skipped BEFORE writing — never "warn and extract".
+pub const MAX_ZIP_ENTRIES: usize = 10_000;
+pub const MAX_SINGLE_ENTRY_UNCOMPRESSED: u64 = 500 * 1024 * 1024; // 500 MB
+pub const MAX_TOTAL_UNCOMPRESSED: u64 = 2 * 1024 * 1024 * 1024; // 2 GB
+pub const MAX_COMPRESSION_RATIO: f64 = 100.0; // 100:1
+
 // ── Real create / extract / list (Wave D §32) ────────────────────
 // These add the `zip` crate. Extraction reuses the validation guards
 // above so a malicious archive cannot escape the destination dir
@@ -201,6 +209,16 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
         .technical(e.to_string())
         .build()
     })?;
+    // Preflight: too many entries → reject the whole archive (decompression-bomb guard).
+    if archive.len() > MAX_ZIP_ENTRIES {
+        return Err(AppError::builder(
+            code::INVALID_INPUT,
+            ErrorCategory::Validation,
+            "That archive has too many entries — Paperu won't extract it (decompression-bomb guard).",
+        )
+        .technical(format!("{} entries (max {})", archive.len(), MAX_ZIP_ENTRIES))
+        .build());
+    }
     let base = Path::new(dest);
     if !base.exists() {
         std::fs::create_dir_all(base).map_err(|e| {
@@ -216,6 +234,7 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
     let mut extracted = Vec::new();
     let mut skipped = Vec::new();
     let mut warnings = Vec::new();
+    let mut total_uncompressed: u64 = 0;
     for i in 0..archive.len() {
         let mut entry = match archive.by_index(i) {
             Ok(e) => e,
@@ -225,23 +244,47 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
             }
         };
         let name = entry.name().to_string();
-        // ZIP Slip guard.
+        // ZIP Slip guard — reject unsafe entry names before any write.
         let safe_rel = match validate_zip_entry(&name) {
             Ok(p) => p,
             Err(_) => {
-                skipped.push(format!("{name} (unsafe entry name)"));
+                skipped.push(format!("{name} (unsafe entry name — ZIP Slip rejected)"));
                 continue;
             }
         };
-        // Decompression-bomb guard.
-        if is_suspicious_ratio(entry.size(), entry.compressed_size()) {
-            warnings.push(format!(
-                "{}: suspicious ratio ({} → {})",
-                name,
+        // Single-entry size ceiling — reject before writing.
+        if entry.size() > MAX_SINGLE_ENTRY_UNCOMPRESSED {
+            skipped.push(format!(
+                "{name} (entry too large: {} bytes > {} — decompression-bomb guard)",
                 entry.size(),
-                entry.compressed_size()
+                MAX_SINGLE_ENTRY_UNCOMPRESSED
             ));
-            // Still extract — the user asked — but warn them.
+            continue;
+        }
+        // Total-output ceiling — reject once cumulative output would exceed.
+        total_uncompressed = total_uncompressed.saturating_add(entry.size());
+        if total_uncompressed > MAX_TOTAL_UNCOMPRESSED {
+            skipped.push(format!(
+                "{name} (total uncompressed {} would exceed {} — aborting remaining entries)",
+                total_uncompressed, MAX_TOTAL_UNCOMPRESSED
+            ));
+            warnings.push(format!(
+                "extraction stopped at {name}: total-output ceiling reached"
+            ));
+            break;
+        }
+        // Compression-ratio ceiling — REJECT (not warn) a zip-bomb entry.
+        if is_suspicious_ratio(entry.size(), entry.compressed_size()) {
+            let ratio = if entry.compressed_size() == 0 {
+                0.0
+            } else {
+                entry.size() as f64 / entry.compressed_size() as f64
+            };
+            skipped.push(format!(
+                "{name} (compression ratio {:.0}:1 exceeds {:.0}:1 — zip-bomb entry rejected)",
+                ratio, MAX_COMPRESSION_RATIO
+            ));
+            continue;
         }
         let out_path = base.join(&safe_rel);
         // Create the parent directory first so we can canonicalize it for
@@ -271,7 +314,12 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
         match std::fs::File::create(&out_path) {
             Ok(mut out_file) => {
                 if let Err(e) = std::io::copy(&mut entry, &mut out_file) {
-                    skipped.push(format!("{name} (write failed: {e})"));
+                    // Partial-output cleanup: remove the truncated file so the
+                    // user never gets a corrupt partial output.
+                    let _ = std::fs::remove_file(&out_path);
+                    skipped.push(format!(
+                        "{name} (write failed: {e} — partial output cleaned up)"
+                    ));
                 } else {
                     extracted.push(name);
                 }

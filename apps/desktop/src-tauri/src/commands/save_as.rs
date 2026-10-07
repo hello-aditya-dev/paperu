@@ -85,9 +85,8 @@ pub fn save_file_as(request: SaveFileAsRequest) -> Result<SaveFileAsResponse> {
 
     // 5. Atomic finalize. If overwrite is false and dest exists, this
     //    returns ALREADY_EXISTS — the frontend can re-prompt the user.
-    filesystem::temp::atomic_finalize(&temp, &dest, request.overwrite).map_err(|e| {
+    filesystem::temp::atomic_finalize(&temp, &dest, request.overwrite).inspect_err(|_| {
         let _ = fs::remove_file(&temp);
-        e
     })?;
 
     // 6. Read back real metadata about the output (size, kind, etc.).

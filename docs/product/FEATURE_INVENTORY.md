@@ -92,7 +92,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Recipes | ABSENT | no | — | — | — | — | — | reusable workflow definitions |
 | Local Backup Recipes | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | dry-run, run, verify |
 | Timer Jobs | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | schedule eval, execution history |
-| Watch Folders | USEFUL | yes | ✅ live event feed + start/stop | ✅ notify (CC0) + notify-debouncer-mini (MIT/Apache) | ✅ SQLite (rules schema) | — | ✅ | wire events to non-destructive recipes |
+| Watch Folders | FOUNDATION | yes | ✅ live event feed + start/stop | ✅ notify (CC0) + Paperu debounce | ✅ SQLite (rules schema) | ✅ Rust (5 watch tests) | ✅ | rule→recipe execution, history, failure reporting |
 | USB / Drive Toolbox | SHELL | no | ✅ stub | — | — | — | ✅ | copy+verify+checksum |
 
 ## Commercial / Platform

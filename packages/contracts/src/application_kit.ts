@@ -64,4 +64,5 @@ export const ApplicationKitCommand = {
   List: "list_application_kit_items",
   Update: "update_application_kit_item",
   Remove: "remove_application_kit_item",
+  Replace: "replace_application_kit_item",
 } as const;

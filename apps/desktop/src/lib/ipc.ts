@@ -394,6 +394,18 @@ export async function removeApplicationKitItem(id: string): Promise<void> {
   await call<null>(ApplicationKitCommand.Remove, { id });
 }
 
+/**
+ * Atomically replace a kit item's file reference (90% §7). Single
+ * transactional UPDATE — preserves the id; failure leaves the original
+ * item unchanged (no remove-then-add gap).
+ */
+export async function replaceApplicationKitItem(
+  id: string,
+  request: AddApplicationKitItemRequest,
+): Promise<ApplicationKitItem> {
+  return call<ApplicationKitItem>(ApplicationKitCommand.Replace, { id, request });
+}
+
 // ── Folder Organizer (rules-based file automation) ────────────────
 
 /** Persist a folder-organizer rule (insert or replace by id). Returns the id. */

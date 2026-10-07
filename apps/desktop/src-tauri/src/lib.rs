@@ -153,6 +153,7 @@ mod runtime {
                 crate::commands::application_kit::list_application_kit_items,
                 crate::commands::application_kit::update_application_kit_item,
                 crate::commands::application_kit::remove_application_kit_item,
+                crate::commands::application_kit::replace_application_kit_item,
                 crate::commands::notes::create_note,
                 crate::commands::notes::list_notes,
                 crate::commands::notes::get_note,

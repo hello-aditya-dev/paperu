@@ -19,7 +19,7 @@ use std::io::Cursor;
 /// The rotation is cumulative (adds to any existing /Rotate value) and
 /// normalized to [0, 360).
 pub fn rotate_pages(bytes: &[u8], angle: u16, pages: &[u32]) -> Result<Vec<u8>> {
-    if angle % 90 != 0 || angle > 270 {
+    if !angle.is_multiple_of(90) || angle > 270 {
         return Err(AppError::builder(
             code::INVALID_INPUT,
             ErrorCategory::Validation,

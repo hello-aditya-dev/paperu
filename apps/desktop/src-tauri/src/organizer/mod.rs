@@ -18,9 +18,18 @@ pub struct OrganizerRule {
     pub dest_folder: String,
     pub condition_type: String,
     pub condition_value: String,
-    pub action: String, // move|copy
+    pub action: String,                  // move|copy
+    pub conflict_policy: Option<String>, // "rename" (default) | "skip"
     pub enabled: Option<bool>,
     pub sort_order: Option<i64>,
+}
+
+/// Resolve the rule's conflict policy string to the enum (default Rename).
+fn policy_of(rule: &OrganizerRule) -> crate::filesystem::ConflictPolicy {
+    match rule.conflict_policy.as_deref().unwrap_or("rename") {
+        "skip" => crate::filesystem::ConflictPolicy::Skip,
+        _ => crate::filesystem::ConflictPolicy::Rename,
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -165,14 +174,14 @@ pub fn execute(rule: &OrganizerRule) -> Result<ExecuteResult> {
 
     // Reuse the dry-run matcher to decide which files to act on.
     let preview = dry_run(rule)?;
+    let policy = policy_of(rule);
     let mut succeeded = Vec::new();
     let mut failed = Vec::new();
 
     for file in preview.matched_files.into_iter() {
         let from = Path::new(&file.path);
         let to = Path::new(&file.dest_path);
-        // Skip directories — only act on files (the matcher already does
-        // this, but defend against symlinks to directories).
+        // Skip directories — only act on files.
         if !from.is_file() {
             failed.push(ExecuteFailure {
                 path: file.path.clone(),
@@ -181,16 +190,35 @@ pub fn execute(rule: &OrganizerRule) -> Result<ExecuteResult> {
             });
             continue;
         }
+        // Collision-safe destination (90% §6). Default Rename never
+        // overwrites; Skip returns None. Overwrite is NOT offered here.
+        let final_dest = match crate::filesystem::resolve_conflict(to, policy) {
+            Some(p) => p,
+            None => {
+                failed.push(ExecuteFailure {
+                    path: file.path.clone(),
+                    name: file.name.clone(),
+                    error: "Destination exists — skipped (conflict policy: skip).".to_string(),
+                });
+                continue;
+            }
+        };
         let outcome = match rule.action.as_str() {
-            "move" => move_file(from, to),
-            "copy" => std::fs::copy(from, to).map(|_| ()),
+            "move" => move_file(from, &final_dest),
+            "copy" => std::fs::copy(from, &final_dest).map(|_| ()),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 "Unknown action",
             )),
         };
         match outcome {
-            Ok(()) => succeeded.push(file),
+            Ok(()) => {
+                // Report the final destination (which may differ from the
+                // dry-run dest_path if a collision was renamed).
+                let mut out = file;
+                out.dest_path = final_dest.to_string_lossy().to_string();
+                succeeded.push(out);
+            }
             Err(e) => failed.push(ExecuteFailure {
                 path: file.path,
                 name: file.name,
@@ -236,8 +264,8 @@ pub fn save_rule(db: &Database, rule: &OrganizerRule) -> Result<String> {
         conn.execute(
             "INSERT OR REPLACE INTO organizer_rule
                 (id, name, source_folder, dest_folder, condition_type,
-                 condition_value, action, enabled, sort_order, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                 condition_value, action, conflict_policy, enabled, sort_order, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 id,
                 rule.name,
@@ -246,6 +274,7 @@ pub fn save_rule(db: &Database, rule: &OrganizerRule) -> Result<String> {
                 rule.condition_type,
                 rule.condition_value,
                 rule.action,
+                rule.conflict_policy,
                 enabled,
                 sort,
                 now
@@ -261,13 +290,13 @@ pub fn list_rules(db: &Database) -> Result<Vec<OrganizerRule>> {
         let mut stmt = conn
             .prepare(
                 "SELECT id, name, source_folder, dest_folder, condition_type,
-                    condition_value, action, enabled, sort_order
+                    condition_value, action, conflict_policy, enabled, sort_order
              FROM organizer_rule ORDER BY sort_order",
             )
             .map_err(map_sqlite)?;
         let rows = stmt
             .query_map([], |r| {
-                let enabled_int: i64 = r.get(7)?;
+                let enabled_int: i64 = r.get(8)?;
                 Ok(OrganizerRule {
                     id: Some(r.get(0)?),
                     name: r.get(1)?,
@@ -276,8 +305,9 @@ pub fn list_rules(db: &Database) -> Result<Vec<OrganizerRule>> {
                     condition_type: r.get(4)?,
                     condition_value: r.get(5)?,
                     action: r.get(6)?,
+                    conflict_policy: r.get(7)?,
                     enabled: Some(enabled_int != 0),
-                    sort_order: Some(r.get(8)?),
+                    sort_order: Some(r.get(9)?),
                 })
             })
             .map_err(map_sqlite)?;
@@ -344,6 +374,7 @@ mod tests {
             condition_type: "extension".to_string(),
             condition_value: "pdf".to_string(),
             action: "move".to_string(),
+            conflict_policy: None,
             enabled: Some(true),
             sort_order: None,
         };
@@ -365,6 +396,7 @@ mod tests {
             condition_type: "extension".to_string(),
             condition_value: "pdf".to_string(),
             action: "move".to_string(),
+            conflict_policy: None,
             enabled: Some(true),
             sort_order: None,
         };
@@ -392,6 +424,7 @@ mod tests {
             condition_type: "extension".to_string(),
             condition_value: "pdf".to_string(),
             action: "move".to_string(),
+            conflict_policy: None,
             enabled: Some(true),
             sort_order: None,
         };
@@ -429,6 +462,7 @@ mod tests {
             condition_type: "extension".to_string(),
             condition_value: "pdf".to_string(),
             action: "copy".to_string(),
+            conflict_policy: None,
             enabled: Some(true),
             sort_order: None,
         };
@@ -445,20 +479,21 @@ mod tests {
     }
 
     #[test]
-    fn execute_reports_per_file_failure_without_aborting_batch() {
-        // A same-named directory at the destination blocks the move for
-        // that one file (rename into an existing directory entry fails),
-        // while other matched files still succeed — proving the batch
-        // never aborts on a single per-file failure.
-        let tmp = std::env::temp_dir().join(format!("paperu-exec-fail-{}", uuid::Uuid::new_v4()));
+    fn execute_directory_collision_is_renamed_around() {
+        // 90% §6: a same-named DIRECTORY at the destination no longer blocks
+        // the move — the shared conflict resolver renames the incoming file
+        // to "blocked (1).pdf" so the batch completes. (Previously a
+        // directory collision was a per-file failure; the conflict resolver
+        // makes it a success.)
+        let tmp =
+            std::env::temp_dir().join(format!("paperu-exec-dircollide-{}", uuid::Uuid::new_v4()));
         let src = tmp.join("src");
         let dest = tmp.join("dest");
         std::fs::create_dir_all(&src).unwrap();
         std::fs::create_dir_all(&dest).unwrap();
         std::fs::write(src.join("ok.pdf"), b"ok").unwrap();
-        std::fs::write(src.join("blocked.pdf"), b"blocked").unwrap();
-        // Make dest/blocked.pdf a directory — the move for blocked.pdf
-        // cannot overwrite a directory with a file rename.
+        std::fs::write(src.join("blocked.pdf"), b"blocked-content").unwrap();
+        // Make dest/blocked.pdf a directory — a same-name collision.
         std::fs::create_dir_all(dest.join("blocked.pdf")).unwrap();
         let rule = OrganizerRule {
             id: None,
@@ -468,21 +503,119 @@ mod tests {
             condition_type: "extension".to_string(),
             condition_value: "pdf".to_string(),
             action: "move".to_string(),
+            conflict_policy: None, // default rename
             enabled: Some(true),
             sort_order: None,
         };
         let result = execute(&rule).unwrap();
+        // Both files succeed — the directory collision is renamed around.
+        assert_eq!(
+            result.succeeded.len(),
+            2,
+            "both files move (collision renamed)"
+        );
+        // ok.pdf went to dest/ok.pdf.
+        assert!(dest.join("ok.pdf").is_file());
+        // blocked.pdf went to dest/blocked (1).pdf; the directory is untouched.
         assert!(
-            result.succeeded.iter().any(|f| f.name == "ok.pdf"),
-            "ok.pdf should move successfully"
+            dest.join("blocked.pdf").is_dir(),
+            "the directory collision is untouched"
         );
         assert!(
-            result.failed.iter().any(|f| f.name == "blocked.pdf"),
-            "blocked.pdf should be reported as failed, not crash the batch"
+            dest.join("blocked (1).pdf").is_file(),
+            "the incoming file is renamed"
         );
-        // ok.pdf is gone from source (moved); blocked.pdf stays in source.
+        assert_eq!(
+            std::fs::read(dest.join("blocked (1).pdf")).unwrap(),
+            b"blocked-content"
+        );
+        // Both source files are gone (moved).
         assert!(!src.join("ok.pdf").exists());
-        assert!(src.join("blocked.pdf").exists());
+        assert!(!src.join("blocked.pdf").exists());
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn execute_default_rename_never_overwrites_destination() {
+        // 90% §6: a collision must NEVER silently overwrite. The default
+        // policy (rename) writes the incoming file to "name (1).ext"; the
+        // existing destination's content is untouched.
+        let tmp =
+            std::env::temp_dir().join(format!("paperu-collision-rename-{}", uuid::Uuid::new_v4()));
+        let src = tmp.join("src");
+        let dest = tmp.join("dest");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(src.join("a.pdf"), b"INCOMING").unwrap();
+        // Pre-create the collision at the destination with different content.
+        std::fs::write(dest.join("a.pdf"), b"PRE-EXISTING").unwrap();
+        let rule = OrganizerRule {
+            id: None,
+            name: "PDFs".to_string(),
+            source_folder: src.to_string_lossy().to_string(),
+            dest_folder: dest.to_string_lossy().to_string(),
+            condition_type: "extension".to_string(),
+            condition_value: "pdf".to_string(),
+            action: "move".to_string(),
+            conflict_policy: None, // default → rename
+            enabled: Some(true),
+            sort_order: None,
+        };
+        let result = execute(&rule).unwrap();
+        assert_eq!(
+            result.succeeded.len(),
+            1,
+            "the incoming file is moved (renamed)"
+        );
+        // The pre-existing content is UNTOUCHED.
+        assert_eq!(std::fs::read(dest.join("a.pdf")).unwrap(), b"PRE-EXISTING");
+        // The incoming file landed at "a (1).pdf" with its content.
+        assert_eq!(std::fs::read(dest.join("a (1).pdf")).unwrap(), b"INCOMING");
+        // The succeeded entry reports the FINAL (renamed) destination.
+        assert!(
+            result.succeeded[0].dest_path.ends_with("a (1).pdf"),
+            "report the renamed destination"
+        );
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn execute_skip_policy_leaves_existing_untouched() {
+        // 90% §6: the skip policy leaves the existing destination untouched
+        // AND the source in place (the file is skipped, not moved).
+        let tmp =
+            std::env::temp_dir().join(format!("paperu-collision-skip-{}", uuid::Uuid::new_v4()));
+        let src = tmp.join("src");
+        let dest = tmp.join("dest");
+        std::fs::create_dir_all(&src).unwrap();
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(src.join("a.pdf"), b"INCOMING").unwrap();
+        std::fs::write(dest.join("a.pdf"), b"PRE-EXISTING").unwrap();
+        let rule = OrganizerRule {
+            id: None,
+            name: "PDFs".to_string(),
+            source_folder: src.to_string_lossy().to_string(),
+            dest_folder: dest.to_string_lossy().to_string(),
+            condition_type: "extension".to_string(),
+            condition_value: "pdf".to_string(),
+            action: "move".to_string(),
+            conflict_policy: Some("skip".to_string()),
+            enabled: Some(true),
+            sort_order: None,
+        };
+        let result = execute(&rule).unwrap();
+        assert_eq!(
+            result.succeeded.len(),
+            0,
+            "the collision is skipped, not moved"
+        );
+        assert!(
+            result.failed.iter().any(|f| f.name == "a.pdf"),
+            "reported as skipped"
+        );
+        // Both files are untouched.
+        assert_eq!(std::fs::read(dest.join("a.pdf")).unwrap(), b"PRE-EXISTING");
+        assert_eq!(std::fs::read(src.join("a.pdf")).unwrap(), b"INCOMING");
         std::fs::remove_dir_all(&tmp).ok();
     }
 }

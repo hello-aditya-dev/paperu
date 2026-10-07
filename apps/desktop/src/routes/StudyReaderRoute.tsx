@@ -1,29 +1,31 @@
 /**
  * Study Reader route — open a PDF, navigate pages, remember position
- * (Master Prompt 4 §23-26).
+ * (Master Prompt 4 §23-26, 90% §3 routing repair).
  *
- * Lean V1 implementation: page navigation (prev/next/jump), zoom,
- * fit-width toggle, and last-reading-position persistence via the
- * canonical reading_history table. Uses pdfjs-dist (lazy-loaded).
+ * ROUTING REPAIR: the previous router passed `path={null}` for both
+ * `/reader` and `/reader/:path`, so the Reader never received a file.
+ * The fix resolves the path from THREE sources (no raw Windows path
+ * embedded as a URL segment — that's unsafe + fragile):
+ *   1. a `?path=<urlencoded absolute path>` query param (deep links from
+ *      Quick Look, Recent Work, PDF workspace, Universal Drop);
+ *   2. the staged WorkingFile store (composable workflows that stage a
+ *      PDF then navigate to /reader);
+ *   3. a native Tauri file picker (the user opens a PDF directly).
  *
- * NOT implemented tonight (honest, per §0): highlights, bookmarks,
- * annotations, tabs. These would be half-built; better to ship a
- * reliable reader that opens + navigates + remembers position than
- * a broken annotation layer.
- *
- * Performance (§24): pages are rendered on demand (one at a time).
- * The full 300-page PDF is not pre-rendered. Memory should stay flat.
+ * V1: page navigation (prev/next/jump), zoom, fit-width toggle, and
+ * last-reading-position persistence via reading_history. Uses pdfjs-dist
+ * (lazy-loaded). Pages render on demand (one at a time) — a 500-page
+ * PDF is not pre-rendered. Memory stays flat.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
+import { open } from "@tauri-apps/plugin-dialog";
 import { filePath } from "@paperu/contracts";
-import { getReadingHistory, upsertReadingHistory } from "@/lib/ipc";
+import { getReadingHistory, inspectFile, upsertReadingHistory } from "@/lib/ipc";
 import { readFileBytes } from "@/lib/file-picker";
-
-interface StudyReaderRouteProps {
-  /** The file path to read. Passed via the route query string. */
-  readonly path: string | null;
-}
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { Button, Card } from "@paperu/ui";
 
 type FitMode = "manual" | "fit-width";
 
@@ -38,10 +40,17 @@ function clampZoom(z: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 }
 
-export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNode {
-  // We track whether reading-history exists for this path (to jump to
-  // the last page on first load) but we don't render it directly —
-  // the upsert effect writes position changes silently.
+export function StudyReaderRoute(): React.ReactNode {
+  // Resolve the path from (1) a query param, (2) the staged WorkingFile,
+  // (3) a native picker (below). Never from a raw URL path segment.
+  const [searchParams] = useSearchParams();
+  const queryPath = searchParams.get("path");
+  const { staged } = useStagedFile("pdf");
+  const [pickedPath, setPickedPath] = useState<string | null>(null);
+  // staged.path is absolute + validated by inspect; queryPath is a deep link
+  // that we validate on use. pickedPath comes from the native picker.
+  const path = queryPath ?? pickedPath ?? staged?.path ?? null;
+
   const [, setHistoryExists] = useState(false);
   const [pageNum, setPageNum] = useState(1);
   const [pageCount, setPageCount] = useState(1);
@@ -49,14 +58,15 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
   const [fitMode, setFitMode] = useState<FitMode>("manual");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [validating, setValidating] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   // Natural page width at scale 1.0 (pdfjs user-space units ≈ 1/72").
-  // Captured when a page renders so fit-width can compute a real scale.
   const naturalWidthRef = useRef<number | null>(null);
   const upsertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Real fit-width: containerWidth / naturalPageWidth, with padding + bounds.
+  // Declared BEFORE the effects that use it (resize recalc + fit-width click).
   const computeFitZoom = useCallback((): number | null => {
     const natural = naturalWidthRef.current;
     const viewport = viewportRef.current;
@@ -66,10 +76,44 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     return clampZoom(containerWidth / natural);
   }, []);
 
+  // Native picker — the user opens a PDF directly in the Reader.
+  const handlePick = useCallback(async () => {
+    setError(null);
+    setValidating(true);
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: "Choose a PDF to read — Paperu",
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (typeof selected !== "string" || selected.length === 0) {
+        setValidating(false);
+        return;
+      }
+      // Validate via the canonical inspect_file (magic-byte, not extension).
+      const inspected = await inspectFile(selected);
+      if (inspected.kind !== "pdf") {
+        setError("That file isn't a PDF.");
+        setValidating(false);
+        return;
+      }
+      // Set the path as the picked path (NOT a query param — picked paths
+      // stay in component state; only deep links use the query param).
+      setPickedPath(selected);
+      setPageNum(1);
+      setFitMode("manual");
+      naturalWidthRef.current = null;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setValidating(false);
+    }
+  }, []);
+
   // Load reading history for the path; jump to last page if present.
   useEffect(() => {
     if (!path) {
-      setError("No file selected.");
       return;
     }
     let cancelled = false;
@@ -89,9 +133,6 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
   }, [path]);
 
   // Render the current page to the canvas (lazy, on-demand).
-  // Uses the canonical readFileBytes (Paperu FilePath → Uint8Array)
-  // instead of pdfjs.getDocument(path) — repair §19. File access stays
-  // under Paperu's narrow Rust path validation.
   useEffect(() => {
     if (!path || !canvasRef.current) return;
     let cancelled = false;
@@ -100,19 +141,14 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
-        // Canonical path: readFileBytes returns Uint8Array from the
-        // Rust read_file_bytes command (validated, sandboxed).
         const bytes = await readFileBytes(path);
         if (cancelled) return;
-        // pdfjs needs a fresh copy of the data (it transfers ownership).
         const loadingTask = pdfjs.getDocument({ data: bytes.slice() });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
         setPageCount(pdf.numPages);
         const page = await pdf.getPage(pageNum);
         if (cancelled) return;
-        // Capture the natural page width at scale 1.0 so the fit-width
-        // button can compute a REAL scale instead of faking zoom=1.
         naturalWidthRef.current = page.getViewport({ scale: 1.0 }).width;
         const viewport = page.getViewport({ scale: zoom });
         const canvas = canvasRef.current;
@@ -135,9 +171,7 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     };
   }, [path, pageNum, zoom]);
 
-  // Recalculate fit-width zoom on viewport resize (master prompt §659).
-  // When fit-mode is "fit-width", a window resize must re-fit the page
-  // to the new container width. In manual mode, the user's zoom stays.
+  // Recalculate fit-width zoom on viewport resize.
   useEffect(() => {
     if (fitMode !== "fit-width") return;
     const onResize = () => {
@@ -145,25 +179,17 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
       if (fit !== null) setZoom(fit);
     };
     window.addEventListener("resize", onResize);
-    // Recalculate once on entering fit-width mode (in case the container
-    // changed since the last fit).
     onResize();
     return () => window.removeEventListener("resize", onResize);
   }, [fitMode, computeFitZoom]);
 
-  // If the path changes, reset fit-mode to manual so a new document
-  // doesn't inherit the previous fit-width state before its natural
-  // width is known.
+  // If the path changes, reset fit-mode + natural width.
   useEffect(() => {
     setFitMode("manual");
     naturalWidthRef.current = null;
   }, [path]);
 
   // Debounced upsert of reading position.
-  // FIX (repair §20): the previous guard `if (!path || !history) return`
-  // meant a brand-new document with NO prior history never created a
-  // row. Now we write on every path + page change, creating the row
-  // on first open. The Rust upsert handles INSERT-or-UPDATE correctly.
   useEffect(() => {
     if (!path) return;
     if (upsertTimer.current) clearTimeout(upsertTimer.current);
@@ -176,13 +202,10 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
           fileKind: "pdf",
           lastPage: pageNum,
           zoomLevel: zoom,
-          // Intentionally omit bookmarks — None means "leave existing
-          // bookmarks unchanged" (repair §21). We don't want to clobber
-          // bookmarks every time the user scrolls.
         });
         setHistoryExists(true);
       } catch {
-        // Non-fatal — reading history is convenience, not critical.
+        // Non-fatal.
       }
     }, 1200);
     return () => {
@@ -190,12 +213,37 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     };
   }, [path, pageNum, zoom]);
 
+  // computeFitZoom is declared above (before the effects that use it).
+
   if (!path) {
     return (
-      <section className="paperu-reader">
-        <p className="paperu-reader__empty">
-          Open a PDF to start reading.
-        </p>
+      <section className="paperu-section" aria-labelledby="reader-heading">
+        <header className="paperu-section__header">
+          <h1 id="reader-heading" className="paperu-text-display">Study Reader</h1>
+          <p className="paperu-text-lead">
+            Open a PDF to read. Page navigation, true fit-width, and last-position memory.
+          </p>
+        </header>
+        <Card>
+          <div style={{ padding: "var(--paperu-space-5)" }}>
+            <p className="paperu-text-caption">
+              {staged
+                ? "Loading the staged PDF…"
+                : "No PDF selected. Open one, or navigate here from a result card (Open in Reader)."}
+            </p>
+            <Button variant="accent" onClick={handlePick} disabled={validating} style={{ marginTop: "var(--paperu-space-3)" }}>
+              {validating ? "Opening…" : "Choose a PDF"}
+            </Button>
+          </div>
+        </Card>
+        {error && (
+          <Card className="paperu-error" role="status">
+            <div className="paperu-error__head">
+              <span className="paperu-error__badge" aria-hidden="true">!</span>
+              <h2 className="paperu-error__title">{error}</h2>
+            </div>
+          </Card>
+        )}
       </section>
     );
   }
@@ -265,10 +313,6 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
             className={`paperu-reader__btn${fitMode === "fit-width" ? " is-active" : ""}`}
             aria-pressed={fitMode === "fit-width"}
             onClick={() => {
-              // TRUE fit-width (master prompt §659): compute the real scale
-              // from containerWidth / naturalPageWidth. If the natural width
-              // isn't known yet (page still rendering), mark fit-mode so the
-              // resize effect will compute it on the next render.
               setFitMode("fit-width");
               const fit = computeFitZoom();
               if (fit !== null) setZoom(fit);

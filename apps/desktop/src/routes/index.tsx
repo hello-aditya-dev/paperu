@@ -163,11 +163,9 @@ export const router = createHashRouter([
       },
       { path: "portal", element: withSuspense(<PortalReadyRoute />) },
       { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
-      {
-        path: "reader",
-        element: withSuspense(<StudyReaderRoute path={null} />),
-      },
-      { path: "reader/:path", element: withSuspense(<StudyReaderRoute path={null} />) },
+      // Reader resolves the path from a ?path= query param, the staged
+      // WorkingFile store, or a native picker — never a raw URL segment.
+      { path: "reader", element: withSuspense(<StudyReaderRoute />) },
       { path: "notes", element: withSuspense(<NotesRoute />) },
       { path: "print", element: withSuspense(<PrintStudioRoute />) },
       { path: "batch", element: withSuspense(<BatchStudioRoute />) },

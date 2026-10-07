@@ -36,3 +36,14 @@ pub fn update_application_kit_item(
 pub fn remove_application_kit_item(state: tauri::State<'_, AppState>, id: String) -> Result<()> {
     application_kit::remove(&state.db, &id)
 }
+
+/// Atomically replace a kit item's file reference (90% §7). Single
+/// transactional UPDATE — preserves the id; failure leaves the original.
+#[tauri::command]
+pub fn replace_application_kit_item(
+    state: tauri::State<'_, AppState>,
+    id: String,
+    request: AddApplicationKitItemRequest,
+) -> Result<ApplicationKitItem> {
+    application_kit::replace(&state.db, &id, request)
+}
