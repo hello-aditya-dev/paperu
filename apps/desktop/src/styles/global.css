@@ -4,6 +4,7 @@
 @import "@paperu/ui/styles.css";
 @import "./command.css";
 @import "./shelf.css";
+@import "./action-palette.css";
 
 *,
 *::before,

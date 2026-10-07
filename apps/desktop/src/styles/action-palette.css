@@ -1,0 +1,121 @@
+/* Paperu — Smart Action Palette styles.
+ * Contextual actions for the current selection (Master Prompt 3 §13-16).
+ */
+
+.paperu-action-palette__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--paperu-z-modal, 100);
+  background: color-mix(in srgb, var(--paperu-ink) 15%, transparent);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 18vh;
+}
+
+.paperu-action-palette {
+  width: min(420px, 90vw);
+  background: var(--paperu-bg);
+  border: 1px solid var(--paperu-border-strong);
+  border-radius: var(--paperu-radius-lg);
+  box-shadow: var(--paperu-shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.18));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.paperu-action-palette__header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--paperu-space-3);
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  border-bottom: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+}
+.paperu-action-palette__file {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text);
+  font-weight: var(--paperu-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+.paperu-action-palette__kind {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.paperu-action-palette__body {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--paperu-space-2) 0;
+  outline: none;
+}
+
+.paperu-action-palette__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.paperu-action-palette__row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--paperu-space-3);
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.paperu-action-palette__row.is-active {
+  background: color-mix(in srgb, var(--paperu-accent) 12%, transparent);
+  border-left-color: var(--paperu-accent);
+}
+.paperu-action-palette__row.is-active .paperu-action-palette__row-label {
+  color: var(--paperu-accent);
+}
+.paperu-action-palette__row.is-system .paperu-action-palette__row-label::before {
+  content: "⋯";
+  margin-right: var(--paperu-space-2);
+  color: var(--paperu-text-muted);
+}
+.paperu-action-palette__row-label {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-md);
+  color: var(--paperu-text);
+  flex-shrink: 0;
+}
+.paperu-action-palette__row-hint {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+  flex: 1;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paperu-action-palette__footer {
+  padding: var(--paperu-space-2) var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-2);
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paperu-action-palette,
+  .paperu-action-palette__row {
+    transition: none !important;
+    animation: none !important;
+  }
+}
