@@ -9,7 +9,7 @@ use rusqlite::params;
 use std::path::Path;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OrganizerRule {
     pub id: Option<String>,
