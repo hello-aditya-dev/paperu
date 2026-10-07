@@ -56,6 +56,9 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "jsdom",
+    // Use vmThreads pool to avoid jsdom/vitest forks-pool serialization
+    // issue ("webidl.util.markAsUncloneable is not a function").
+    pool: "vmThreads",
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
