@@ -203,13 +203,17 @@ pub fn execute(rule: &OrganizerRule) -> Result<ExecuteResult> {
 
 /// Move a file, falling back to copy+delete across volumes. std::fs::rename
 /// is atomic on the same filesystem but fails across volume boundaries
-/// (e.g. C: → D: on Windows). The fallback preserves source-safety: the
-/// source is only removed after a successful copy.
+/// (e.g. C: → D: on Windows, / → /mnt on Linux). The fallback preserves
+/// source-safety: the source is only removed after a successful copy.
+///
+/// Uses the portable `ErrorKind::CrossesDevices` (stable since Rust 1.85)
+/// rather than a raw OS error code, so the fallback triggers correctly on
+/// both Windows (ERROR_NOT_SAME_DEVICE) and Linux (EXDEV).
 fn move_file(from: &Path, to: &Path) -> std::io::Result<()> {
     match std::fs::rename(from, to) {
         Ok(()) => Ok(()),
-        Err(e) if e.raw_os_error() == Some(18) => {
-            // EXDEV — crosses devices. Fall back to copy + remove.
+        Err(e) if e.kind() == std::io::ErrorKind::CrossesDevices => {
+            // Cross-device link — fall back to copy + remove.
             std::fs::copy(from, to)?;
             std::fs::remove_file(from)?;
             Ok(())
