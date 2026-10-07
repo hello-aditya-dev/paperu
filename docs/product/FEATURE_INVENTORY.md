@@ -53,7 +53,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 ## Student / Application Workflows
 | Feature | Status | Available | Frontend | Backend | Persistence | Tests | Windows Compile | Remaining |
 |---|---|---|---|---|---|---|---|---|
-| Assignment Studio | WORKING | yes | ✅ | ✅ | — | — | ✅ | cover, page numbers, A4, target size, rotate/crop |
+| Assignment Studio | USEFUL | yes | ✅ cover/page-numbers/target-size + native paths | ✅ | — | — | ✅ | A4-normalize original PDFs, rotate/crop, signature overlay |
 | Portal Ready | USEFUL | yes | ✅ native paths + AbortController + compliance card | ✅ | — | ✅ basename-guard | ✅ | exact dimensions, aspect ratio, multi-constraint pipeline |
 | Application Kit | USEFUL | yes | ✅ add/edit/replace/open/reveal/search/missing-file | ✅ CRUD | ✅ SQLite | ✅ Rust | ✅ | — |
 | Study Reader | WORKING | yes | ✅ true fit-width + resize recalc | ✅ | ✅ SQLite | ✅ Rust | ✅ | search, bookmarks, annotations |
@@ -75,13 +75,13 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 |---|---|---|---|---|---|---|---|---|
 | Rename Studio | USEFUL | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | undo, date tokens |
 | Filename Fixer | WORKING | yes | ✅ | ✅ (reuses rename) | — | shared | ✅ | — |
-| Duplicate Finder | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | perceptual hash, safe delete |
-| Downloads Cleaner | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | native folder picker, move action |
+| Duplicate Finder | USEFUL | yes | ✅ native picker + summary + per-copy reveal/open | ✅ Rust | — | ✅ Rust | ✅ | perceptual hash, safe remove (Rust command) |
+| Downloads Cleaner | USEFUL | yes | ✅ native picker + summary + filter + reveal/open | ✅ Rust | — | ✅ Rust | ✅ | move-to action (Rust command) |
 | Folder Organizer | USEFUL | yes | ✅ native folder pickers + execute + confirmation | ✅ Rust execute (move/copy + cross-volume fallback) | ✅ SQLite | ✅ Rust (3 execute tests) | ✅ | undo |
-| Quick Look | WORKING | yes | ✅ | ✅ | — | — | ✅ | PDF preview, audio/video |
+| Quick Look | USEFUL | yes | ✅ images + text + PDF preview (lazy pdfjs) + reveal/open | ✅ | — | — | ✅ | thumbnails, audio/video |
 | Image Toolbox (Offline Converter) | USEFUL | yes | ✅ convert/resize/crop/rotate/inspect/strip + native paths | ✅ Canvas | — | ✅ detectJpegExifGps (9 tests) | ✅ | batch, visual crop selection |
 | Archive Studio | FOUNDATION | no | ✅ stub | ✅ Rust validation | — | ✅ Rust | ✅ | actual ZIP create/extract |
-| File Rescue | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | recovery actions (re-save, re-encode) |
+| File Rescue | USEFUL | yes | ✅ diagnose + real recovery (re-encode fresh copy) | ✅ Rust | — | ✅ Rust | ✅ | more recovery strategies |
 | File Inspector | USEFUL | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | metadata detail, privacy indicators |
 | Clipboard History | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | capture, search, pin, security review |
 | Comparison Tools | ABSENT | no | — | — | — | — | — | PDF/document diff |
