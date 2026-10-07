@@ -432,3 +432,22 @@ Stage Summary:
 - Gates: typecheck ✅, lint ✅ (--max-warnings 0), 129 frontend tests ✅, build ✅ (478ms), rust fmt ✅, clippy ✅ (-D warnings), 95 Rust tests ✅ (was 86, +9 pdf_native).
 - Windows CI: prior commit (zip crate) completed GREEN (Windows Tauri build 5m16s, all 3 jobs). This commit (lopdf + notify) CI run 37692853415 in_progress — both are pure Rust, will compile on Windows MSVC.
 - Features newly made working this sprint (cumulative across both sub-sprints): Portal Ready (native paths + compliance card), Print Studio (native paths), Batch Studio (native paths + real cancellation), Study Reader (true fit-width), Application Kit (full CRUD), Folder Organizer (real execute), Image Toolbox (crop/rotate/inspect exposed), Assignment Studio (cover/page-numbers/target-size), Downloads Cleaner (native picker + summary), Duplicate Finder (native picker + summary), File Rescue (real recovery), Quick Look (PDF preview), Archive Studio (real ZIP create/extract/list), PDF Rotate/Delete/Extract pages (lopdf), Watch Folders (real notify watcher). Plus the P1 repairs: basename→absolute native paths, truthful EXIF GPS detection, finalizeOutput basename guard.
+
+---
+Task ID: oss-harvest-windows-green
+Agent: Builder (Z.ai Code)
+Task: Verify the OSS harvest (lopdf + notify + zip) on Windows MSVC + produce the installer artifact.
+
+Work Log:
+- First Windows CI run for the lopdf+notify commit FAILED on `commands/watch.rs` — notify-debouncer-mini 0.7 API mismatch (DebouncedEventKind only has Any/AnyContinuous, losing create/modify/remove; Debouncer<T> takes 1 type param; `watch` is via `watcher()`). The blind-spot: commands/*.rs is `#![cfg(feature = "tauri-runtime")]`, only compiled on Windows CI, so my local Linux clippy missed it.
+- Architecture fix: moved the notify watcher logic into a NON-GATED `src/watch/mod.rs` (pure Rust, compiles + tests on Linux without tauri-runtime). commands/watch.rs is now a thin Tauri wrapper. Switched from notify-debouncer-mini to notify directly + a clean manual 400ms path-dedupe debounce (the mini debouncer loses the create/modify/remove distinction the UX needs). 5 new Rust tests (lifecycle fires on real file creation via inotify, reject-nonexistent, is_paperu_output filter, camelCase serialization, event_kind_label mapping) — all pass locally.
+- Second Windows CI run FAILED on `commands/pdf_native.rs:26` — base64 index was u8 not usize (same commands-blind-spot). Fix: moved bytes_to_base64 + the B64 const into the non-gated `src/pdf_native/mod.rs` with a unit test (the canonical 'Man'→'TWFu', 'M'→'TQ==' vectors). commands/pdf_native.rs now calls crate::pdf_native::bytes_to_base64. Also fixed a clippy manual_div_ceil lint.
+- Third Windows CI run (40a0a2c) — ALL GREEN: Frontend ✓ (47s), Rust core ✓ (59s), Windows Tauri build ✓ (8m37s, longer due to lopdf+notify compile). Windows artifact paperu-windows-x64-40a0a2c... produced (unsigned release candidate + SHA256SUMS).
+
+Stage Summary:
+- The commands-blind-spot (gated files only compiled on Windows CI) is now structurally addressed for watch + pdf_native: the core logic lives in non-gated modules (src/watch/, src/pdf_native/) that ARE compiled + tested on Linux CI, so API/type mismatches are caught locally before Windows CI. organizer + archive_studio commands were already validated green in earlier runs.
+- DIRECT DEPENDENCIES (Bucket A) added this sprint: zip 2.4.2 (MIT), lopdf 0.45 (MIT), notify 8 (CC0). All compile on Windows MSVC + produce the installer.
+- REFERENCE-ONLY (Bucket C): qpdf, ImageMagick, czkawka, rustic, naps2 (GPL), stirling-pdf (mixed), pdfium-render — no code copied, learnings documented.
+- NO GPL code copied (§8). All OSS harvest is Bucket A (published deps).
+- Final gate counts: typecheck ✅, lint ✅ (--max-warnings 0), 101 Rust tests ✅, 129 frontend tests ✅, build ✅, rust fmt ✅, clippy ✅ (-D warnings). Windows CI green (3 jobs).
+- Features newly working this sprint (cumulative): PDF Rotate/Delete/Extract pages (lopdf), Watch Folders (notify), Archive Studio ZIP (zip crate) — plus the prior P1 repairs + deepening (Portal Ready, Print Studio, Batch Studio, Study Reader, Application Kit, Folder Organizer, Image Toolbox, Assignment Studio, Downloads Cleaner, Duplicate Finder, File Rescue, Quick Look).
