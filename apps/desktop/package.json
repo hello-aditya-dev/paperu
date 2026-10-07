@@ -21,6 +21,8 @@
     "@paperu/ui": "workspace:*",
     "@tauri-apps/api": "^2.12.1",
     "@tauri-apps/plugin-dialog": "^2.8.1",
+    "pdf-lib": "1.17.1",
+    "pdfjs-dist": "4.8.69",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
