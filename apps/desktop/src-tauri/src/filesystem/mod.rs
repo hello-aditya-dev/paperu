@@ -11,11 +11,13 @@
 //! A failed operation must never destroy or corrupt the source.
 
 pub mod conflict;
+pub mod copy_verify;
 pub mod inspect;
 pub mod paths;
 pub mod temp;
 
 pub use conflict::*;
+pub use copy_verify::*;
 pub use inspect::*;
 pub use paths::*;
 pub use temp::*;
