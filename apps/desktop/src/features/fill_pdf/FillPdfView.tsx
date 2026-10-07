@@ -56,6 +56,7 @@ export function FillPdfView(): React.ReactNode {
   const [page, setPage] = useState(1);
   const [overlays, setOverlays] = useState<OverlayItem[]>([]);
   const [pageRender, setPageRender] = useState<PageRenderResult | null>(null);
+  const [pagePreviewUrl, setPagePreviewUrl] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
   const [fileBytes, setFileBytes] = useState<Uint8Array | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -82,6 +83,18 @@ export function FillPdfView(): React.ReactNode {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [staged]);
+
+  // Manage the page preview as a Blob URL (not toDataURL — doctrine §10).
+  useEffect(() => {
+    if (!pageRender) { setPagePreviewUrl(null); return; }
+    let url: string | null = null;
+    pageRender.canvas.toBlob((blob) => {
+      if (!blob) return;
+      url = URL.createObjectURL(blob);
+      setPagePreviewUrl(url);
+    }, "image/png");
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [pageRender]);
 
   useEffect(() => {
     let cancelled = false;
@@ -394,7 +407,7 @@ export function FillPdfView(): React.ReactNode {
                     role="presentation"
                   >
                     <img
-                      src={pageRender.canvas.toDataURL()}
+                      src={pagePreviewUrl ?? undefined}
                       alt={`Page ${page} preview`}
                       style={{ display: "block", maxWidth: "100%", pointerEvents: "none" }}
                     />
