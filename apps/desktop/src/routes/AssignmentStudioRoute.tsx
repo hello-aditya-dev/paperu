@@ -3,65 +3,52 @@
  * (Master Prompt 4 §8-11).
  *
  * V1 implementation (honest):
- *   - Add photos + PDFs via file picker
- *   - Reorder up/down
- *   - Build one merged PDF (images→PDF + PDF merge)
- *   - Final size shown truthfully
+ *   - Pick photos + PDFs via the CANONICAL Tauri file picker (returns
+ *     absolute paths, not browser File objects — repair §6-8).
+ *   - Inspect each picked file (real kind detection, no extension trust — §30).
+ *   - Reorder up/down — order is PRESERVED through the build (repair §9).
+ *   - Convert each image to a 1-page PDF, merge all in USER ORDER
+ *     (NOT grouped by kind).
+ *   - Final size shown truthfully.
+ *   - Output finalized via canonical finalize_output with REAL absolute
+ *     source path (repair §8).
  *
  * Not yet V1 (deferred per §0 — don't ship half-built):
  *   - Cover page (needs pdf-lib A4 cover generator)
  *   - Page numbers
  *   - A4 normalization of mixed page sizes
- *   - Target-size fit (existing fitPdfToSize takes File, not bytes)
+ *   - Target-size fit (existing fitPdfToSize takes File, not bytes — needs refactor)
  *   - Signature overlay (existing signPdf takes File)
  *   - Rotate/straighten/crop (deterministic impl needs careful work)
  *
- * Source safety (§11): inputs are read-only File objects. Output goes
- * through the canonical finalize_output path.
+ * Source safety (§11): picked files are read-only. Output goes through
+ * the canonical finalize_output path (atomic, non-destructive).
  */
 
 import { useState } from "react";
 import { mergePdfs, imagesToPdf } from "@/engines/pdf-engine";
 import { invoke } from "@tauri-apps/api/core";
-
-interface AssignmentFile {
-  readonly file: File;
-  readonly fileName: string;
-  readonly kind: "image" | "pdf";
-}
-
-function detectKind(file: File): "image" | "pdf" | "other" {
-  const t = file.type.toLowerCase();
-  if (t === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-    return "pdf";
-  }
-  if (t.startsWith("image/")) return "image";
-  return "other";
-}
+import { pickAndInspectFiles, readFileBytes, type PickedFile } from "@/lib/file-picker";
 
 export function AssignmentStudioRoute(): React.ReactNode {
-  const [files, setFiles] = useState<readonly AssignmentFile[]>([]);
+  const [files, setFiles] = useState<readonly PickedFile[]>([]);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resultPath, setResultPath] = useState<string | null>(null);
   const [resultSize, setResultSize] = useState<number | null>(null);
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files ?? []);
-    const valid = picked
-      .map((file) => ({ file, kind: detectKind(file) }))
-      .filter((x): x is { file: File; kind: "image" | "pdf" } =>
-        x.kind === "image" || x.kind === "pdf",
-      );
-    setFiles((cur) => [
-      ...cur,
-      ...valid.map((v) => ({
-        file: v.file,
-        fileName: v.file.name,
-        kind: v.kind,
-      })),
-    ]);
-    e.target.value = ""; // allow re-pick of same files
+  const onPick = async () => {
+    setError(null);
+    try {
+      const picked = await pickAndInspectFiles({
+        multiple: true,
+        accept: "application/pdf,image/*",
+      });
+      if (picked.length === 0) return; // user cancelled or non-Tauri
+      setFiles((cur) => [...cur, ...picked]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const removeFile = (idx: number) => {
@@ -92,42 +79,50 @@ export function AssignmentStudioRoute(): React.ReactNode {
     setResultPath(null);
     setResultSize(null);
     try {
-      // 1. Convert images to a single intermediate PDF (existing engine).
-      const images = files.filter((f) => f.kind === "image");
-      const pdfs = files.filter((f) => f.kind === "pdf");
+      // Process files IN USER ORDER (repair §9): convert each image to
+      // a 1-page PDF, then merge all PDFs (image-derived + original)
+      // in the order they appear in `files`. Do NOT group by kind.
       const inputFiles: File[] = [];
-      if (images.length > 0) {
-        const imagePdfBytes = await imagesToPdf(images.map((f) => f.file), {
-          layout: "a4",
-        });
-        // Wrap in a File so mergePdfs (which takes File[]) can read it.
-        const imagePdfBlob = new Blob([imagePdfBytes.slice()], {
-          type: "application/pdf",
-        });
-        const imagePdfFile = new File([imagePdfBlob], "paperu-assignment-pages.pdf", {
-          type: "application/pdf",
-        });
-        inputFiles.push(imagePdfFile);
+      for (const picked of files) {
+        const bytes = await readFileBytes(picked.path);
+        if (picked.kind === "image") {
+          // Convert this single image to a 1-page PDF.
+          const imgFile = new File([new Blob([bytes.slice()], { type: picked.mimeType ?? "image/*" })], picked.fileName, {
+            type: picked.mimeType ?? "image/*",
+          });
+          const onePagePdfBytes = await imagesToPdf([imgFile], { layout: "a4" });
+          const onePagePdfFile = new File(
+            [new Blob([onePagePdfBytes.slice()], { type: "application/pdf" })],
+            `${picked.fileName}.pdf`,
+            { type: "application/pdf" },
+          );
+          inputFiles.push(onePagePdfFile);
+        } else {
+          // PDF — pass through as a File for mergePdfs.
+          const pdfFile = new File(
+            [new Blob([bytes.slice()], { type: "application/pdf" })],
+            picked.fileName,
+            { type: "application/pdf" },
+          );
+          inputFiles.push(pdfFile);
+        }
       }
-      inputFiles.push(...pdfs.map((f) => f.file));
 
-      // 2. Merge all PDFs into one (existing engine). mergePdfs internally
-      //    validates the output parses and throws if it doesn't.
-      const firstFile = inputFiles[0];
+      // Merge all PDFs in USER ORDER (not grouped). mergePdfs internally
+      // validates the output parses and throws if it doesn't.
       const mergedBytes: Uint8Array =
-        inputFiles.length === 1 && firstFile
-          ? new Uint8Array(await firstFile.arrayBuffer())
+        inputFiles.length === 1
+          ? new Uint8Array(await inputFiles[0]!.arrayBuffer())
           : await mergePdfs(inputFiles);
 
-      // 3. Finalize through the canonical non-destructive path.
-      //    (Tauri finalize_output command — atomic, source untouched.)
+      // Finalize through the canonical non-destructive path with the
+      // REAL absolute source path (repair §8 — was file.name, a basename).
       const bytesBase64 = bytesToBase64(mergedBytes);
-      const suffix = "-paperu-assignment";
-      const firstUserFile = files[0];
+      const firstSourcePath = files[0]!.path; // absolute, validated by inspect
       const outputPath = (await invoke<string>("finalize_output", {
         request: {
-          sourcePath: firstUserFile?.fileName ?? "assignment",
-          suffix,
+          sourcePath: firstSourcePath,
+          suffix: "-paperu-assignment",
           extension: "pdf",
           bytesBase64,
         },
@@ -151,23 +146,19 @@ export function AssignmentStudioRoute(): React.ReactNode {
       </header>
 
       <div className="paperu-assignment__v1-notice">
-        V1: merges photos + PDFs into one PDF. Cover page, page numbers,
-        and A4 normalization arrive next sprint — don't ship half-built.
+        V1: merges photos + PDFs into one PDF, in your chosen order.
+        Cover page, page numbers, A4 normalization, and target-size
+        fit arrive next sprint — don't ship half-built.
       </div>
 
       <section className="paperu-assignment__files">
-        <label className="paperu-assignment__picker">
-          <input
-            type="file"
-            accept="application/pdf,image/*"
-            multiple
-            onChange={onPick}
-            style={{ display: "none" }}
-          />
-          <span className="paperu-assignment__picker-label">
-            + Add photos or PDFs
-          </span>
-        </label>
+        <button
+          type="button"
+          className="paperu-assignment__picker"
+          onClick={onPick}
+        >
+          + Add photos or PDFs
+        </button>
         {files.length === 0 ? (
           <p className="paperu-assignment__empty">
             No files yet. Pick photos or PDFs to start.
@@ -175,7 +166,7 @@ export function AssignmentStudioRoute(): React.ReactNode {
         ) : (
           <ul className="paperu-assignment__file-list">
             {files.map((f, idx) => (
-              <li key={`${f.fileName}-${idx}`} className="paperu-assignment__file">
+              <li key={`${f.path}-${idx}`} className="paperu-assignment__file">
                 <span className="paperu-assignment__file-glyph" aria-hidden="true">
                   {f.kind === "image" ? "▦" : "▤"}
                 </span>

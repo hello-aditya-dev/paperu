@@ -14,8 +14,18 @@ use crate::errors::{code, AppError, ErrorCategory, ErrorSeverity, Recoverability
 pub fn upsert(db: &Database, req: UpdateReadingHistoryRequest) -> Result<ReadingHistoryEntry> {
     db.with_conn(|conn| {
         let now = now_iso(conn)?;
-        let bookmarks_json =
-            serde_json::to_string(&req.bookmarks.unwrap_or_default()).map_err(AppError::from)?;
+        // Bookmark preservation (repair §21):
+        //   None  → leave existing bookmarks unchanged (SQL NULL → COALESCE keeps the row value)
+        //   Some(vec) → set bookmarks to that vec (even if empty: Some([]) explicitly clears)
+        // The previous code did `unwrap_or_default()` which converted
+        // None to `[]`, then COALESCE'd — but a non-NULL `"[]"` always
+        // wins over the row value, clobbering stored bookmarks on every
+        // page-change scroll. Now None becomes SQL NULL so COALESCE
+        // preserves the existing row.
+        let bookmarks_param: Option<String> = match &req.bookmarks {
+            None => None,
+            Some(vec) => Some(serde_json::to_string(vec).map_err(AppError::from)?),
+        };
         // Try UPDATE first; if no row affected, INSERT.
         let updated = conn
             .execute(
@@ -33,15 +43,18 @@ pub fn upsert(db: &Database, req: UpdateReadingHistoryRequest) -> Result<Reading
                     req.last_page,
                     req.scroll_y,
                     req.zoom_level,
-                    bookmarks_json,
+                    bookmarks_param,
                     now,
                     req.file_path,
                 ],
             )
             .map_err(map_sqlite)?;
         if updated == 0 {
-            // Insert new row.
+            // Insert new row. For a brand-new row, None bookmarks
+            // (caller didn't specify) defaults to the empty array
+            // (the column default is '[]'). Some(vec) persists as-is.
             let id = Uuid::new_v4().to_string();
+            let init_bookmarks = bookmarks_param.unwrap_or_else(|| "[]".to_string());
             conn.execute(
                 "INSERT INTO reading_history
                     (id, file_path, file_name, file_kind, last_page, scroll_y,
@@ -55,7 +68,7 @@ pub fn upsert(db: &Database, req: UpdateReadingHistoryRequest) -> Result<Reading
                     req.last_page.unwrap_or(1),
                     req.scroll_y.unwrap_or(0.0),
                     req.zoom_level.unwrap_or(1.0),
-                    bookmarks_json,
+                    init_bookmarks,
                     now,
                 ],
             )
@@ -292,5 +305,106 @@ mod tests {
         assert_eq!(list(&db).unwrap().len(), 3);
         clear(&db).unwrap();
         assert_eq!(list(&db).unwrap().len(), 0);
+    }
+
+    /// Regression (repair §21): a scroll/page-change upsert with
+    /// `bookmarks: None` MUST NOT clobber existing bookmarks. The
+    /// previous code's `unwrap_or_default()` converted None to `[]`
+    /// and silently erased stored bookmarks on every scroll.
+    #[test]
+    fn none_bookmarks_preserves_existing() {
+        let db = fresh_db();
+        // First upsert: store bookmarks [1, 5, 10].
+        upsert(
+            &db,
+            UpdateReadingHistoryRequest {
+                file_path: "/tmp/book.pdf".to_string(),
+                file_name: "book.pdf".to_string(),
+                file_kind: "pdf".to_string(),
+                last_page: Some(1),
+                scroll_y: None,
+                zoom_level: None,
+                bookmarks: Some(vec![1, 5, 10]),
+            },
+        )
+        .unwrap();
+        // Second upsert: page change, bookmarks: None.
+        // The bug would clobber [1,5,10] → [].
+        let after = upsert(
+            &db,
+            UpdateReadingHistoryRequest {
+                file_path: "/tmp/book.pdf".to_string(),
+                file_name: "book.pdf".to_string(),
+                file_kind: "pdf".to_string(),
+                last_page: Some(42),
+                scroll_y: None,
+                zoom_level: None,
+                bookmarks: None, // ← must preserve existing
+            },
+        )
+        .unwrap();
+        assert_eq!(after.last_page, 42);
+        assert_eq!(after.bookmarks, vec![1, 5, 10], "bookmarks preserved");
+    }
+
+    /// Regression (repair §21): `Some([])` explicitly clears bookmarks.
+    /// This is the orthogonal case — None preserves, Some([]) clears.
+    #[test]
+    fn some_empty_bookmarks_clears_existing() {
+        let db = fresh_db();
+        upsert(
+            &db,
+            UpdateReadingHistoryRequest {
+                file_path: "/tmp/c.pdf".to_string(),
+                file_name: "c.pdf".to_string(),
+                file_kind: "pdf".to_string(),
+                last_page: Some(1),
+                scroll_y: None,
+                zoom_level: None,
+                bookmarks: Some(vec![2, 4, 6]),
+            },
+        )
+        .unwrap();
+        let after = upsert(
+            &db,
+            UpdateReadingHistoryRequest {
+                file_path: "/tmp/c.pdf".to_string(),
+                file_name: "c.pdf".to_string(),
+                file_kind: "pdf".to_string(),
+                last_page: Some(2),
+                scroll_y: None,
+                zoom_level: None,
+                bookmarks: Some(vec![]), // ← explicit clear
+            },
+        )
+        .unwrap();
+        assert_eq!(after.bookmarks, Vec::<i64>::new());
+    }
+
+    /// Regression (repair §20): opening a brand-new PDF (no prior
+    /// history row) and changing page MUST create a history row.
+    #[test]
+    fn first_open_creates_history_row() {
+        let db = fresh_db();
+        // No prior history. Open + change page.
+        let entry = upsert(
+            &db,
+            UpdateReadingHistoryRequest {
+                file_path: "/tmp/new.pdf".to_string(),
+                file_name: "new.pdf".to_string(),
+                file_kind: "pdf".to_string(),
+                last_page: Some(5),
+                scroll_y: None,
+                zoom_level: None,
+                bookmarks: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(entry.last_page, 5);
+        assert_eq!(entry.file_name, "new.pdf");
+        // Verify a row actually exists now.
+        let fetched = get_for_path(&db, "/tmp/new.pdf").unwrap();
+        assert!(fetched.is_some(), "history row created on first open");
+        assert_eq!(fetched.unwrap().last_page, 5);
     }
 }

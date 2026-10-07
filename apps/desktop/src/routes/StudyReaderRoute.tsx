@@ -16,9 +16,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import type { ReadingHistoryEntry } from "@paperu/contracts";
 import { filePath } from "@paperu/contracts";
 import { getReadingHistory, upsertReadingHistory } from "@/lib/ipc";
+import { readFileBytes } from "@/lib/file-picker";
 
 interface StudyReaderRouteProps {
   /** The file path to read. Passed via the route query string. */
@@ -26,7 +26,10 @@ interface StudyReaderRouteProps {
 }
 
 export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNode {
-  const [history, setHistory] = useState<ReadingHistoryEntry | null>(null);
+  // We track whether reading-history exists for this path (to jump to
+  // the last page on first load) but we don't render it directly —
+  // the upsert effect writes position changes silently.
+  const [, setHistoryExists] = useState(false);
   const [pageNum, setPageNum] = useState(1);
   const [pageCount, setPageCount] = useState(1);
   const [zoom, setZoom] = useState(1.0);
@@ -46,7 +49,7 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
       try {
         const entry = await getReadingHistory(path);
         if (cancelled) return;
-        setHistory(entry);
+        setHistoryExists(true);
         if (entry) setPageNum(entry.lastPage);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -58,6 +61,9 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
   }, [path]);
 
   // Render the current page to the canvas (lazy, on-demand).
+  // Uses the canonical readFileBytes (Paperu FilePath → Uint8Array)
+  // instead of pdfjs.getDocument(path) — repair §19. File access stays
+  // under Paperu's narrow Rust path validation.
   useEffect(() => {
     if (!path || !canvasRef.current) return;
     let cancelled = false;
@@ -66,7 +72,12 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     (async () => {
       try {
         const pdfjs = await import("pdfjs-dist");
-        const loadingTask = pdfjs.getDocument(path);
+        // Canonical path: readFileBytes returns Uint8Array from the
+        // Rust read_file_bytes command (validated, sandboxed).
+        const bytes = await readFileBytes(path);
+        if (cancelled) return;
+        // pdfjs needs a fresh copy of the data (it transfers ownership).
+        const loadingTask = pdfjs.getDocument({ data: bytes.slice() });
         const pdf = await loadingTask.promise;
         if (cancelled) return;
         setPageCount(pdf.numPages);
@@ -94,8 +105,12 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
   }, [path, pageNum, zoom]);
 
   // Debounced upsert of reading position.
+  // FIX (repair §20): the previous guard `if (!path || !history) return`
+  // meant a brand-new document with NO prior history never created a
+  // row. Now we write on every path + page change, creating the row
+  // on first open. The Rust upsert handles INSERT-or-UPDATE correctly.
   useEffect(() => {
-    if (!path || !history) return;
+    if (!path) return;
     if (upsertTimer.current) clearTimeout(upsertTimer.current);
     upsertTimer.current = setTimeout(async () => {
       try {
@@ -106,7 +121,11 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
           fileKind: "pdf",
           lastPage: pageNum,
           zoomLevel: zoom,
+          // Intentionally omit bookmarks — None means "leave existing
+          // bookmarks unchanged" (repair §21). We don't want to clobber
+          // bookmarks every time the user scrolls.
         });
+        setHistoryExists(true);
       } catch {
         // Non-fatal — reading history is convenience, not critical.
       }
@@ -114,7 +133,7 @@ export function StudyReaderRoute({ path }: StudyReaderRouteProps): React.ReactNo
     return () => {
       if (upsertTimer.current) clearTimeout(upsertTimer.current);
     };
-  }, [path, history, pageNum, zoom]);
+  }, [path, pageNum, zoom]);
 
   if (!path) {
     return (
