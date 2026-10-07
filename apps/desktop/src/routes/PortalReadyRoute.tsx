@@ -21,7 +21,7 @@
 import { useState } from "react";
 import { fitPdfToSize, type PdfFitResult } from "@/engines/pdf-engine";
 import { fitImageToSize, type ImageFitResult } from "@/engines/image-engine";
-import { invoke } from "@tauri-apps/api/core";
+import { finalizeOutput } from "@/lib/ipc";
 
 type ResultKind = PdfFitResult | ImageFitResult;
 
@@ -75,18 +75,9 @@ export function PortalReadyRoute(): React.ReactNode {
         : await fitImageToSize(file, { targetBytes });
 
       // Finalize through the canonical non-destructive path.
-      const bytesBase64 = bytesToBase64(r.bytes);
       const ext = isPdf ? "pdf" : isImageResult(r) ? r.format : "bin";
-      const suffix = "-portal-ready";
-      const out = (await invoke<string>("finalize_output", {
-        request: {
-          sourcePath: file.name,
-          suffix,
-          extension: ext,
-          bytesBase64,
-        },
-      })) as string;
-      setOutputPath(out);
+      const out = await finalizeOutput(file.name, "-portal-ready", ext, r.bytes);
+      setOutputPath(out.outputPath);
       setResult(r);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -211,13 +202,6 @@ function ComplianceCard({
   );
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return btoa(bin);
-}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

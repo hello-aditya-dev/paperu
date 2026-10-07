@@ -27,8 +27,8 @@
 
 import { useState } from "react";
 import { mergePdfs, imagesToPdf } from "@/engines/pdf-engine";
-import { invoke } from "@tauri-apps/api/core";
 import { pickAndInspectFiles, readFileBytes, type PickedFile } from "@/lib/file-picker";
+import { finalizeOutput } from "@/lib/ipc";
 
 export function AssignmentStudioRoute(): React.ReactNode {
   const [files, setFiles] = useState<readonly PickedFile[]>([]);
@@ -117,17 +117,10 @@ export function AssignmentStudioRoute(): React.ReactNode {
 
       // Finalize through the canonical non-destructive path with the
       // REAL absolute source path (repair §8 — was file.name, a basename).
-      const bytesBase64 = bytesToBase64(mergedBytes);
+      
       const firstSourcePath = files[0]!.path; // absolute, validated by inspect
-      const outputPath = (await invoke<string>("finalize_output", {
-        request: {
-          sourcePath: firstSourcePath,
-          suffix: "-paperu-assignment",
-          extension: "pdf",
-          bytesBase64,
-        },
-      })) as string;
-      setResultPath(outputPath);
+      const result = await finalizeOutput(firstSourcePath, "-paperu-assignment", "pdf", mergedBytes);
+      setResultPath(result.outputPath);
       setResultSize(mergedBytes.byteLength);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -228,13 +221,6 @@ export function AssignmentStudioRoute(): React.ReactNode {
   );
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return btoa(bin);
-}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

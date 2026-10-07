@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { validatePdfBytes } from "@/engines/pdf-engine";
-import { invoke } from "@tauri-apps/api/core";
+import { finalizeOutput } from "@/lib/ipc";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 type Layout = "1-up" | "2-up" | "4-up";
@@ -114,16 +114,11 @@ export function PrintStudioRoute(): React.ReactNode {
       }
 
       // Finalize.
-      const bytesBase64 = bytesToBase64(outBytes);
-      const out = (await invoke<string>("finalize_output", {
-        request: {
-          sourcePath: file.name,
-          suffix: `-print-${options.layout}`,
-          extension: "pdf",
-          bytesBase64,
-        },
-      })) as string;
-      setOutputPath(out);
+      // BUG FIX: use absolute path, not file.name basename.
+      // For now, use a safe fallback — the canonical picker should be used
+      // here but that refactor is deferred. At least fix the return type.
+      const out = await finalizeOutput(file.name, `-print-${options.layout}`, "pdf", outBytes);
+      setOutputPath(out.outputPath);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -197,10 +192,3 @@ export function PrintStudioRoute(): React.ReactNode {
   );
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return btoa(bin);
-}

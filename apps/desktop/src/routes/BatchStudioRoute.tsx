@@ -13,7 +13,7 @@
 import { useState } from "react";
 import { fitPdfToSize } from "@/engines/pdf-engine";
 import { fitImageToSize } from "@/engines/image-engine";
-import { invoke } from "@tauri-apps/api/core";
+import { finalizeOutput } from "@/lib/ipc";
 
 type BatchOp = "pdf-fit" | "image-fit" | "images-to-pdf";
 
@@ -107,24 +107,12 @@ export function BatchStudioRoute(): React.ReactNode {
               `Operation ${op} doesn't support ${item.kind} files.`,
             );
           }
-          const bytesBase64 = bytesToBase64(outBytes);
-          const suffix =
-            op === "pdf-fit"
-              ? "-fit"
-              : op === "image-fit"
-                ? "-fit"
-                : "-paperu";
-          const out = (await invoke<string>("finalize_output", {
-            request: {
-              sourcePath: item.fileName,
-              suffix,
-              extension: ext,
-              bytesBase64,
-            },
-          })) as string;
+          const suffix = op === "pdf-fit" || op === "image-fit" ? "-fit" : "-paperu";
+          const out = await finalizeOutput(item.fileName, suffix, ext, outBytes);
+          const outPath = out.outputPath;
           updateItem(item.id, {
             status: "done",
-            resultPath: out,
+            resultPath: outPath,
             resultSize: finalSize,
           });
         } catch (err) {
@@ -243,13 +231,6 @@ export function BatchStudioRoute(): React.ReactNode {
   );
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i] ?? 0);
-  }
-  return btoa(bin);
-}
 
 function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

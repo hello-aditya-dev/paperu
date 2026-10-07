@@ -11,8 +11,8 @@
  *   + Clean metadata (EXIF/GPS stripping)
  */
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { pickAndInspectFiles, readFileBytes } from "@/lib/file-picker";
+import { finalizeOutput } from "@/lib/ipc";
 import { convertImage, resizeImage, stripExif } from "@/engines/image-engine";
 
 type ConvertAction = "convert" | "resize" | "clean-metadata";
@@ -68,11 +68,8 @@ export function OfflineConverterRoute(): React.ReactNode {
         throw new Error("Invalid action or missing parameters.");
       }
       // Finalize via canonical finalize_output.
-      const b64 = bytesToBase64(outputBytes);
-      const out = await invoke<string>("finalize_output", {
-        request: { sourcePath: file.path, suffix: `-converted`, extension: ext, bytesBase64: b64 },
-      });
-      setResult({ outputPath: out, removed, width, height });
+      const out = await finalizeOutput(file.path, "-converted", ext, outputBytes);
+      setResult({ outputPath: out.outputPath, removed, width, height });
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { setProcessing(false); }
   };
@@ -120,8 +117,3 @@ export function OfflineConverterRoute(): React.ReactNode {
   );
 }
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i] ?? 0);
-  return btoa(bin);
-}

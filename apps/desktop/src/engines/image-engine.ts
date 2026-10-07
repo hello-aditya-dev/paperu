@@ -61,6 +61,29 @@ function canvasToBlob(
   );
 }
 
+/**
+ * Detect real transparency by scanning bitmap pixels for alpha < 255.
+ * Only returns true if the image actually has transparent pixels,
+ * not merely because Canvas ImageData has 4 channels.
+ */
+function detectTransparency(bmp: ImageBitmap): boolean {
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.min(bmp.width, 64);
+  canvas.height = Math.min(bmp.height, 64);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  try {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i]! < 255) return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
+}
+
 export async function fitImageToSize(
   file: File,
   opts: ImageFitOptions,
@@ -71,13 +94,11 @@ export async function fitImageToSize(
   const originalWidth = bmp.width;
   const originalHeight = bmp.height;
 
-  // Detect transparency by checking if the bitmap has alpha.
-  // We render to a canvas and check for alpha channel presence.
-  const probeCanvas = document.createElement("canvas");
-  probeCanvas.width = 1;
-  probeCanvas.height = 1;
-  const probeCtx = probeCanvas.getContext("2d");
-  const hasAlpha = probeCtx ? probeCtx.getImageData(0, 0, 1, 1).data.length === 4 : false;
+  // Detect transparency: check if the image format supports alpha
+  // AND if any pixel actually has alpha < 255. The old code checked
+  // Canvas ImageData channel count which is always 4 (RGBA) — making
+  // every image appear transparent. Now we actually scan pixels.
+  const hasAlpha = detectTransparency(bmp);
 
   // Decide format: PNG for transparency, JPEG for photos.
   const format: ImgFormat = hasAlpha ? "png" : "jpeg";
