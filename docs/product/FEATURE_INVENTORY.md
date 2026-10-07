@@ -24,8 +24,8 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | PDF → Images | USEFUL | yes | ✅ | ✅ | — | ✅ | ✅ | — |
 | Sign PDF | USEFUL | yes | ✅ | ✅ | — | ✅ | ✅ | PKI disclaimer |
 | Fill PDF | USEFUL | yes | ✅ | ✅ | — | ✅ | ✅ | — |
-| Print Studio | WORKING | yes | ✅ | ✅ | — | — | ✅ | grayscale, page range, passport sheets |
-| Study Reader | FOUNDATION | yes | ✅ | ✅ | ✅ SQLite | — | ✅ | search, bookmarks, annotations, real fit-width |
+| Print Studio | USEFUL | yes | ✅ native paths + AbortController | ✅ | — | — | ✅ | grayscale, passport sheets |
+| Study Reader | WORKING | yes | ✅ true fit-width (real container/page calc + resize recalc) | ✅ | ✅ SQLite | — | ✅ | search, bookmarks, annotations |
 | PDF Notebook | SHELL | no | ✅ stub | — | — | — | — | page templates, export |
 | PDF Metadata | FOUNDATION | no | — | ✅ pdf_info | — | ✅ | ✅ | inspect/edit/remove |
 | PDF Annotations | ABSENT | no | — | — | — | — | — | text, highlight, shapes, comments |
@@ -41,12 +41,12 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Feature | Status | Available | Frontend | Backend | Tests | Windows Compile | Remaining |
 |---|---|---|---|---|---|---|---|
 | Image Make It Fit | USEFUL | yes | ✅ | ✅ | ✅ | ✅ | — |
-| Resize | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | route, exact dimensions |
-| Crop | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | route, preset ratios |
-| Rotate | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | route, 90/180/270 |
-| Convert | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | — |
-| Metadata Inspect | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | EXIF detail, GPS detection |
-| EXIF/GPS Strip | WORKING | yes (in Converter) | ✅ | ✅ Canvas | — | ✅ | truthful reporting |
+| Resize | USEFUL | yes (Image Toolbox) | ✅ | ✅ Canvas | — | ✅ | — |
+| Crop | USEFUL | yes (Image Toolbox) | ✅ x/y/w/h | ✅ Canvas | — | ✅ | preset ratios, visual selection |
+| Rotate | USEFUL | yes (Image Toolbox) | ✅ 90/180/270 | ✅ Canvas | — | ✅ | — |
+| Convert | USEFUL | yes (Image Toolbox) | ✅ PNG/JPEG/WebP | ✅ Canvas | — | ✅ | — |
+| Metadata Inspect | USEFUL | yes (Image Toolbox) | ✅ real EXIF + GPS IFD | ✅ Canvas | ✅ detectJpegExifGps (9 tests) | ✅ | EXIF field detail |
+| EXIF/GPS Strip | USEFUL | yes (Image Toolbox) | ✅ truthful report | ✅ Canvas | ✅ | ✅ | — (truthful: reports only what was present) |
 | Watermark | ABSENT | no | — | — | — | — | text/opacity |
 | Brightness/Contrast | ABSENT | no | — | — | — | — | simple adjustments |
 
@@ -54,9 +54,9 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Feature | Status | Available | Frontend | Backend | Persistence | Tests | Windows Compile | Remaining |
 |---|---|---|---|---|---|---|---|---|
 | Assignment Studio | WORKING | yes | ✅ | ✅ | — | — | ✅ | cover, page numbers, A4, target size, rotate/crop |
-| Portal Ready | WORKING | yes | ✅ | ✅ | — | — | ✅ | exact dimensions, aspect ratio, basename fix |
-| Application Kit | FOUNDATION | yes | ✅ list/remove | ✅ CRUD | ✅ SQLite | ✅ Rust | ✅ | add/replace/edit UI, search |
-| Study Reader | FOUNDATION | yes | ✅ | ✅ | ✅ SQLite | ✅ Rust | ✅ | search, bookmarks, annotations, real fit-width |
+| Portal Ready | USEFUL | yes | ✅ native paths + AbortController + compliance card | ✅ | — | ✅ basename-guard | ✅ | exact dimensions, aspect ratio, multi-constraint pipeline |
+| Application Kit | USEFUL | yes | ✅ add/edit/replace/open/reveal/search/missing-file | ✅ CRUD | ✅ SQLite | ✅ Rust | ✅ | — |
+| Study Reader | WORKING | yes | ✅ true fit-width + resize recalc | ✅ | ✅ SQLite | ✅ Rust | ✅ | search, bookmarks, annotations |
 | Notes | WORKING | yes | ✅ | ✅ | ✅ SQLite | ✅ Rust | ✅ | rich editor, attachments |
 | Study Packs | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | CRUD, file refs, missing-file handling |
 | Citation Studio | USEFUL | yes | ✅ | ✅ | ✅ SQLite | ✅ Rust | ✅ | bibliography export, editors |
@@ -64,7 +64,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Document Scanner | SHELL | no | ✅ stub | — | — | — | — | crop, brightness, A4, combine |
 | Screenshot → Assignment | SHELL | no | ✅ stub | — | — | — | — | crop, annotate, bridge |
 | Print Studio / Exam Print | WORKING | yes | ✅ | ✅ | — | — | ✅ | grayscale, page range, passport sheets |
-| Batch Studio | WORKING | yes | ✅ | ✅ | — | — | ✅ | real cancellation, native paths |
+| Batch Studio | USEFUL | yes | ✅ native paths + real cancellation (cancelled state) | ✅ | — | ✅ basename-guard | ✅ | queue persistence |
 | Passport/College Photo | ABSENT | no | — | — | — | — | — | crop, exact dimensions, print sheets |
 | Signature Studio/Vault | ABSENT | no | — | — | — | — | — | draw, upload, reuse |
 | Forms Vault | ABSENT | no | — | — | — | — | — | reusable fields |
@@ -77,9 +77,9 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Filename Fixer | WORKING | yes | ✅ | ✅ (reuses rename) | — | shared | ✅ | — |
 | Duplicate Finder | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | perceptual hash, safe delete |
 | Downloads Cleaner | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | native folder picker, move action |
-| Folder Organizer | WORKING | yes | ✅ | ✅ Rust | ✅ SQLite | ✅ Rust | ✅ | execute workflow, undo |
+| Folder Organizer | USEFUL | yes | ✅ native folder pickers + execute + confirmation | ✅ Rust execute (move/copy + cross-volume fallback) | ✅ SQLite | ✅ Rust (3 execute tests) | ✅ | undo |
 | Quick Look | WORKING | yes | ✅ | ✅ | — | — | ✅ | PDF preview, audio/video |
-| Offline Converter | WORKING | yes | ✅ | ✅ Canvas | — | — | ✅ | PDF→images, batch |
+| Image Toolbox (Offline Converter) | USEFUL | yes | ✅ convert/resize/crop/rotate/inspect/strip + native paths | ✅ Canvas | — | ✅ detectJpegExifGps (9 tests) | ✅ | batch, visual crop selection |
 | Archive Studio | FOUNDATION | no | ✅ stub | ✅ Rust validation | — | ✅ Rust | ✅ | actual ZIP create/extract |
 | File Rescue | WORKING | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | recovery actions (re-save, re-encode) |
 | File Inspector | USEFUL | yes | ✅ | ✅ Rust | — | ✅ Rust | ✅ | metadata detail, privacy indicators |
