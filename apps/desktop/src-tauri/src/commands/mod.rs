@@ -11,11 +11,15 @@
 //! `tauri-runtime` feature. Without it, the functions are plain
 //! Rust functions testable on any platform.
 
+pub mod finalize;
 pub mod inspect;
+pub mod read_file;
 #[cfg(feature = "tauri-runtime")]
 pub mod settings;
 
+pub use finalize::*;
 pub use inspect::*;
+pub use read_file::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
 

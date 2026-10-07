@@ -42,7 +42,7 @@ export function ActionSuggestions({
       label: "Make PDF fit a size",
       desc: "Shrink under 50 KB – 2 MB",
       href: "#/pdf/fit",
-      available: false,
+      available: true,
     });
   }
   if (imageCount >= 1) {

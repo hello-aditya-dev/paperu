@@ -66,8 +66,10 @@ pub mod state;
 
 #[cfg(feature = "tauri-runtime")]
 mod runtime {
+    use crate::commands::finalize::finalize_output;
     use crate::commands::inspect::inspect_file;
     use crate::commands::read_app_info;
+    use crate::commands::read_file::read_file_bytes;
     use crate::commands::settings::{read_settings, write_settings};
     use crate::state::AppState;
     use tauri::Manager;
@@ -121,6 +123,8 @@ mod runtime {
             })
             .invoke_handler(tauri::generate_handler![
                 inspect_file,
+                finalize_output,
+                read_file_bytes,
                 read_settings,
                 write_settings,
                 read_app_info,
