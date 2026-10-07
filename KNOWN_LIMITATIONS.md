@@ -287,3 +287,86 @@ The docs in `docs/` describe the foundation as it exists today.
 ADRs under `docs/decisions/` record the architectural choices made
 for `0.1.0`. As features are added, the corresponding docs are
 updated and new ADRs are appended.
+
+---
+
+## Master Prompt 3 additions (agent/builder @ 05c2a520)
+
+### Shelf is session-scoped, not persisted
+
+The Paperu Shelf (Master Prompt 3 §17-23) is intentionally in-memory only.
+The store (`apps/desktop/src/lib/shelf-store.ts`) holds safe local file
+references (path + metadata), never file contents. Persistence is deferred
+until an explicit privacy/storage policy is approved by Integrator + Guardian.
+Closing Paperu clears the shelf.
+
+### Recent work persists metadata, not document contents
+
+The `recent_work` table (migration 0002) stores file paths, sizes, operation
+id/label, ISO timestamps, and correlation ids. It does NOT store document
+contents, signature image data, or fill text. The History view
+(`/history`) shows what you did and lets you open outputs — it cannot
+re-open the document state. This is by design (privacy doctrine §82).
+
+### Recent work requires the Tauri runtime for persistence
+
+The `useRecentWork` Zustand store mirrors entries to both the in-memory
+`recent-files` store AND the persistent SQLite `recent_work` table. When
+running outside Tauri (unit tests, plain browser), the store falls back to
+in-memory only — entries do not survive a page reload in that mode.
+
+### Lazy-loaded routes have a 1-frame "Loading…" fallback
+
+The 9 feature routes are React.lazy-wrapped (Master Prompt 3 §67-69). On
+first visit, a minimal "Loading…" status appears for one frame before the
+chunk finishes loading. On a fast machine this is imperceptible (~50-200ms
+per route chunk). On slow networks or cold caches, it's more visible.
+
+### pdf-engine chunk is 179 kB gzip (lazy)
+
+The `pdf-engine` chunk contains pdfjs-dist and is 430.82 kB raw / 179.15 kB
+gzip. It loads only when a PDF route is visited. This is the unavoidable
+cost of client-side PDF processing. A future native Rust PDF engine (per
+ADR 0011's "future native replacement strategy") would move this cost to
+the Rust binary.
+
+### Save As is not yet implemented
+
+Master Prompt 3 §25-27 asks for a native Tauri save dialog wired across
+every output-producing Wave-1 feature. This is NOT yet done. Outputs
+currently use the canonical `finalize_output` atomic-finalization path
+(same directory as source, `-paperu` suffix, conflict-renamed). Save As
+requires the Tauri dialog plugin and runtime testing, deferred to the
+next Builder sprint.
+
+### Desktop lifecycle features are stubbed, not runtime-verified
+
+The startup poster (`StartupPoster.tsx`) is implemented and shows
+"Opening Paperu…" → "Loading settings…" → "Ready" before the main shell.
+However, the full desktop lifecycle (single-instance behavior, open-file
+argument routing, window state restore, safe shutdown) requires Tauri
+runtime plugins and is NOT runtime-verified in this build. These are
+deferred to a future Builder sprint.
+
+### Performance instrumentation is not yet present
+
+Master Prompt 3 §64 asks for local timing markers (process start, splash
+first paint, main creation, settings loaded, DB ready, main shown, Command
+first open). These are NOT yet implemented. The startup poster's stage
+text is the closest current equivalent.
+
+### Action Palette is invoked via component props, not a global shortcut
+
+The Smart Action Palette (Master Prompt 3 §13-16) is a reusable component
+that takes a `selection` prop. It's not yet wired to a global keyboard
+shortcut (e.g., Ctrl+K when a file is selected) — that requires application-
+level selection state which isn't yet unified. The palette can be triggered
+by passing a selection from any feature that has one.
+
+### Module registry has stub entries for future modules
+
+The registry lists `notes`, `assignments`, `business-reports`, `capture`
+with `available: false`. These are placeholders for future module waves
+(Master Prompt 3 §101 explicitly says do NOT build these yet). They appear
+in the registry so the Command Center can show them as "coming soon" but
+they are NOT routes and NOT in the nav rail.

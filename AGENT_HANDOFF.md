@@ -191,3 +191,115 @@ When handing off:
 
 The file is the single source of truth for "where are we". If it is
 stale, the agent who notices updates it.
+
+---
+
+## BUILDER HANDOFF — Master Prompt 3 (Mature Core UX + Command Center + Shelf + Desktop Lifecycle)
+
+**Builder branch:** `agent/builder`
+**Starting SHA:** `20a67fad1be14ffa1a6a502be44b7391a004dd63`
+**Final SHA:** `05c2a520` (commit subject: "feat(workspaces): add PDF + Images workspace shells, slim nav rail")
+**Commits added:** 10 (see `git log 20a67fad..05c2a520 --oneline`)
+
+### Features delivered
+
+| Master Prompt 3 § | Feature | Status |
+|---|---|---|
+| §3-4, §16 | Registry-driven navigation (no hardcoded NAV) | ✅ done |
+| §5-12 | Command Center (Ctrl+K, deterministic search, keyboard) | ✅ done |
+| §13-16, §24 | Smart Action Palette (contextual, registry-derived) | ✅ done |
+| §17-23 | Paperu Shelf (session-scoped, add/remove/reorder/send-to-module) | ✅ done |
+| §28-32 | Persistent Recent Work (SQLite migration 0002 + HistoryRoute) | ✅ done |
+| §33, §38-40 | PDF + Images workspace shells, slim 4-item nav rail | ✅ done |
+| §67-69 | Lazy loading (initial bundle 395 kB → 114 kB gzip, 3.5×) | ✅ done |
+
+### Gate results (actually run, not assumed)
+
+- TypeScript typecheck: ✅ green (5 packages)
+- ESLint: ✅ green (5 packages, `--max-warnings 0`)
+- TypeScript tests: ✅ **110 tests** pass in 9 files
+  - 86 original (engine, contracts, drop, inspect, module-registry, platform)
+  - +14 Command Center (empty/exact/alias/prefix/partial/case/whitespace/no-result/ranked/keyboard/recent)
+  - +10 Action Palette (PDF/image/unsupported/missing/keyboard/rapid)
+- Frontend production build: ✅ green, **~114 kB gzip initial JS** (was ~395 kB)
+- `cargo fmt --check`: ✅ green
+- `cargo clippy -D warnings`: ✅ zero warnings
+- `cargo test`: ✅ **27 Rust tests** pass
+  - 22 original (database migrations, filesystem temp, tasks, commands finalize/inspect/shell/read_file/pdf_info)
+  - +5 recent_work (round-trip, most-recent-first, remove-by-id, clear-all, pruning-at-MAX_ENTRIES=200)
+
+### Shared architecture changes (require Integrator awareness)
+
+1. **DB migration 0002** (`apps/desktop/src-tauri/migrations/0002_recent_work.sql`):
+   new `recent_work` table. Idempotent (existing tests cover double-run). Stores
+   ONLY file metadata (paths, sizes, operation id/label) — never document contents.
+2. **Database::from_conn** constructor added (small, additive) — enables in-memory
+   test databases. Does not change production `Database::open` path.
+3. **Module registry expanded** with new fields: `glyph`, `navOrder`, `visibleInNav`,
+   `visibleInCommand`, `pinnable`, `usableAsNextAction`, `contextualPriority`.
+4. **Nav rail reorganized** to 4 items (Home / Recent work / PDF / Images). The 8
+   individual tools now live inside the PDF/Images workspace pages. Direct keyboard
+   access (Ctrl+1..9) is preserved — the handler looks up by `module.shortcut`
+   field, not by nav position.
+5. **New contracts** (`packages/contracts/src/recent_work.ts` + Rust mirror at
+   `contracts/recent_work.rs`): `RecentWorkEntry`, `AddRecentWorkRequest`,
+   `RecentWorkCommand`. Sizes are `i64` (SQLite storage) — JSON-serialized as
+   numbers, lossless for any real-world file size.
+6. **New IPC commands**: `add_recent_work`, `list_recent_work`, `remove_recent_work`,
+   `clear_recent_work` (all feature-gated to `tauri-runtime`).
+
+### NOT done (honest)
+
+| Master Prompt 3 § | Feature | Why deferred |
+|---|---|---|
+| §25-27 | Save As (native Tauri save dialog) | Requires Tauri runtime + dialog plugin; needs runtime testing this sandbox cannot do (no webkit2gtk). |
+| §36 | Simple Mode foundation | Architecture stubbed (registry supports it via `visibleInNav`), but no toggle/preference yet. |
+| §48-58 | Desktop lifecycle (single instance, open-file arg, window state) | Requires Tauri runtime + plugins; needs runtime testing. |
+| §59-62 | Shutdown behavior, crash marker | Same — needs Tauri runtime. |
+| §64 | Performance instrumentation (local timing markers) | Not yet implemented. |
+| §109 | Final 20-min manual polish pass | Not yet done. |
+
+### ADR 0011 status (unchanged)
+
+ADR 0011 (`docs/decisions/0011-pdf-lib-pdfjs-dependency-request.md`) is still
+"Awaiting Integrator approval". Builder's position: pdf-lib + pdfjs-dist are
+load-bearing for Wave-1 (the entire PDF/image engine depends on them). The
+`pdf-engine` chunk is 179 kB gzip, lazy-loaded only on PDF routes. Recommend
+Integrator resolve ADR 0011 before Guardian verification.
+
+### Capability matrix
+
+The capability matrix at `docs/product/COMPETITIVE_CAPABILITY_MATRIX.md`
+still falsely marks "Merge PDFs" and "Split / Extract" as "Guardian Verified".
+`agent/guardian` is still at foundation `1b81e98c` and has tested nothing.
+**Integrator should correct these to "Implemented" or "Builder Verified"**.
+
+### Security doc duplication
+
+Two threat-model files still coexist with conflicting content:
+- `docs/security/threat-model.md` (351 lines, the older comprehensive version)
+- `docs/security/THREAT_MODEL.md` (177 lines, Builder's newer addition)
+
+**Integrator should reconcile these into one canonical threat model.**
+
+### Environment-tested vs not
+
+- ✅ Tested in this sandbox: typecheck, lint, TS tests, frontend build,
+  cargo fmt/clippy/test (all on Linux x86_64 without `tauri-runtime`).
+- ❌ NOT tested here: Tauri runtime, desktop shell, native dialogs,
+  single-instance, open-file argument, actual PDF/image processing at
+  runtime, Windows installer build, Windows Tauri CI.
+
+### Recommended next step
+
+1. **Integrator**: review the 10 new commits on `agent/builder`. Resolve ADR 0011.
+   Correct the false "Guardian Verified" labels in the capability matrix.
+   Reconcile the duplicate threat-model files.
+2. **Integrator**: decide whether to merge `agent/builder` into `agent/integration`
+   and produce a Guardian candidate SHA.
+3. **Guardian**: attack the integration candidate. Verify the 8-module nav
+   reorganization didn't break keyboard shortcuts. Verify recent_work persistence
+   survives app restart. Verify the lazy-loaded chunks load correctly on first
+   visit. Verify Action Palette deduplication logic.
+4. **Builder** (next sprint): Save As, Simple Mode toggle, desktop lifecycle
+   (single instance, open-file arg, window state), performance instrumentation.
