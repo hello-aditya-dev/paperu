@@ -51,7 +51,7 @@ export function ActionSuggestions({
       label: "Make image fit a size",
       desc: "Shrink under any target",
       href: "#/image/fit",
-      available: false,
+      available: true,
     });
   }
   if (pdfCount >= 2) {
