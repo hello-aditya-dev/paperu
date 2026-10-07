@@ -59,6 +59,15 @@ impl Database {
         })
     }
 
+    /// Wrap an already-opened connection. Useful for tests that want
+    /// to run migrations on an in-memory database. The caller is
+    /// responsible for ensuring migrations have been applied.
+    pub fn from_conn(conn: Connection) -> Self {
+        Self {
+            conn: Mutex::new(conn),
+        }
+    }
+
     /// Acquire the connection under the guard.
     pub fn with_conn<F, T>(&self, f: F) -> Result<T>
     where

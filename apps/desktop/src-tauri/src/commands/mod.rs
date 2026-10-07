@@ -16,6 +16,8 @@ pub mod inspect;
 pub mod pdf_info;
 pub mod read_file;
 #[cfg(feature = "tauri-runtime")]
+pub mod recent_work;
+#[cfg(feature = "tauri-runtime")]
 pub mod settings;
 pub mod shell;
 
@@ -23,6 +25,8 @@ pub use finalize::*;
 pub use inspect::*;
 pub use pdf_info::*;
 pub use read_file::*;
+#[cfg(feature = "tauri-runtime")]
+pub use recent_work::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
 pub use shell::*;

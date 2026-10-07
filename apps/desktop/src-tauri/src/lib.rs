@@ -55,6 +55,7 @@ pub mod filesystem;
 pub mod licensing;
 pub mod logging;
 pub mod product;
+pub mod recent_work;
 pub mod security;
 pub mod settings;
 pub mod tasks;

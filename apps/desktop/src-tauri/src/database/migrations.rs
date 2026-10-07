@@ -20,14 +20,21 @@ struct Migration {
     sql: &'static str,
 }
 
-const MIGRATIONS: &[Migration] = &[Migration {
-    version: 1,
-    label: "init",
-    sql: include_str!("../../migrations/0001_init.sql"),
-}];
+const MIGRATIONS: &[Migration] = &[
+    Migration {
+        version: 1,
+        label: "init",
+        sql: include_str!("../../migrations/0001_init.sql"),
+    },
+    Migration {
+        version: 2,
+        label: "recent_work",
+        sql: include_str!("../../migrations/0002_recent_work.sql"),
+    },
+];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 1;
+pub const LATEST_VERSION: u32 = 2;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {

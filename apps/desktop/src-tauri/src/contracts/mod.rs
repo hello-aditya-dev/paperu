@@ -12,10 +12,12 @@
 
 pub mod common;
 pub mod inspect;
+pub mod recent_work;
 pub mod settings;
 pub mod tasks;
 
 pub use common::*;
 pub use inspect::*;
+pub use recent_work::*;
 pub use settings::*;
 pub use tasks::*;
