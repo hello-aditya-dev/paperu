@@ -23,7 +23,7 @@
         "decorations": true,
         "transparent": false,
         "alwaysOnTop": false,
-        "fileDropEnabled": true
+        "dragDropEnabled": true
       }
     ],
     "security": {
