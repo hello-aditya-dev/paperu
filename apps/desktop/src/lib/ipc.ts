@@ -21,12 +21,15 @@ import type {
   CreateNoteRequest,
   DryRunResult,
   ExecuteResult,
+  FileEntry,
+  DuplicateGroup,
   InspectFileResponse,
   Note,
   NoteFolder,
   OrganizerRule,
   ReadingHistoryEntry,
   RecentWorkEntry,
+  RescueDiagnosis,
   Settings,
   SettingsPatch,
   UpdateApplicationKitItemRequest,
@@ -35,11 +38,14 @@ import type {
 } from "@paperu/contracts";
 import {
   ApplicationKitCommand,
+  CleanerCommand,
   CommandName,
+  DuplicateCommand,
   NotesCommand,
   OrganizerCommand,
   ReadingHistoryCommand,
   RecentWorkCommand,
+  RescueCommand,
   isAppError,
   appError as buildAppError,
   ErrorCategory,
@@ -411,6 +417,29 @@ export async function dryRunOrganizer(rule: OrganizerRule): Promise<DryRunResult
  */
 export async function executeOrganizerRule(rule: OrganizerRule): Promise<ExecuteResult> {
   return call<ExecuteResult>(OrganizerCommand.Execute, { rule });
+}
+
+// ── Downloads Cleaner ─────────────────────────────────────────────
+
+/** Scan a folder and return categorized file entries. Never deletes. */
+export async function scanDownloadsFolder(folder: string): Promise<FileEntry[]> {
+  return call<FileEntry[]>(CleanerCommand.Scan, { folder });
+}
+
+// ── Duplicate Finder ───────────────────────────────────────────────
+
+/** Find exact duplicate files (by content hash) in a folder. Returns
+ *  groups of identical files. Never deletes — the caller chooses. */
+export async function findExactDuplicates(folder: string): Promise<DuplicateGroup[]> {
+  return call<DuplicateGroup[]>(DuplicateCommand.Find, { folder });
+}
+
+// ── File Rescue ────────────────────────────────────────────────────
+
+/** Diagnose a possibly-damaged file via Rust magic-byte inspection.
+ *  Conservative — never modifies the original. */
+export async function diagnoseFile(path: string): Promise<RescueDiagnosis> {
+  return call<RescueDiagnosis>(RescueCommand.Diagnose, { path });
 }
 
 // ── Notes ────────────────────────────────────────────────────────
