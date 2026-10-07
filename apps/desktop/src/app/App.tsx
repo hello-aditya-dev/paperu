@@ -18,6 +18,7 @@ import { readAppInfo, readSettings } from "@/lib/ipc";
 import { useTheme } from "@/hooks/useTheme";
 import { AppInfoBadge } from "@/components/AppInfoBadge";
 import { PrivacyFooter } from "@/components/PrivacyFooter";
+import { StartupPoster } from "@/components/StartupPoster";
 import { formatShortcut } from "@/lib/platform";
 
 interface NavItem {
@@ -43,20 +44,32 @@ const NAV: readonly NavItem[] = [
 export function App(): React.ReactNode {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const [initStage, setInitStage] = useState("Opening Paperu…");
+  const [ready, setReady] = useState(false);
+  const [initFailed, setInitFailed] = useState(false);
 
   useTheme(settings.theme, settings.reducedMotion);
 
   useEffect(() => {
     let cancelled = false;
+    setInitStage("Opening Paperu…");
     (async () => {
       try {
+        setInitStage("Loading settings…");
         const [i, s] = await Promise.all([readAppInfo(), readSettings()]);
-        if (!cancelled) {
-          setInfo(i);
-          setSettings(s);
-        }
+        if (cancelled) return;
+        setInfo(i);
+        setSettings(s);
+        setInitStage("Ready");
+        // Small delay to let the main shell paint before removing the poster.
+        requestAnimationFrame(() => {
+          if (!cancelled) setReady(true);
+        });
       } catch {
-        // Settings are non-fatal; defaults remain in place.
+        if (!cancelled) {
+          // Settings are non-fatal; defaults remain in place.
+          setReady(true);
+        }
       }
     })();
     return () => {
@@ -91,6 +104,24 @@ export function App(): React.ReactNode {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Show the startup poster while real init work happens (doctrine §12).
+  // The poster is removed the moment the app is genuinely usable.
+  if (!ready) {
+    return (
+      <StartupPoster
+        stage={initStage}
+        failed={initFailed}
+        onRetry={() => {
+          setInitFailed(false);
+          setReady(false);
+          setInitStage("Opening Paperu…");
+          // Trigger re-initialization by reloading.
+          window.location.reload();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="paperu-shell">

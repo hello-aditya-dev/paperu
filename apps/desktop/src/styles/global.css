@@ -5,6 +5,7 @@
 @import "@paperu/ui/styles.css";
 @import "./typography.css";
 @import "./nextactions.css";
+@import "./splash.css";
 
 *,
 *::before,

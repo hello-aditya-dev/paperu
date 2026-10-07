@@ -1,0 +1,106 @@
+/* ── Startup poster (doctrine §10-13, §69) ──────────────────────── */
+.paperu-splash {
+  position: fixed;
+  inset: 0;
+  z-index: var(--paperu-z-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--paperu-bg);
+  /* No white/black flash — respect theme from first pixel (§71). */
+  animation: paperu-splash-fade-in var(--paperu-duration-fast)
+    var(--paperu-ease-standard);
+}
+
+@keyframes paperu-splash-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.paperu-splash__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--paperu-space-3);
+}
+
+.paperu-splash__mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--paperu-radius-md);
+  background: var(--paperu-accent);
+  color: var(--paperu-accent-foreground);
+  font-family: var(--paperu-font-serif);
+  font-weight: var(--paperu-weight-bold);
+  font-size: var(--paperu-text-2xl);
+  box-shadow: var(--paperu-shadow-sm);
+  margin-bottom: var(--paperu-space-2);
+}
+
+.paperu-splash__wordmark {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-2xl);
+  font-weight: var(--paperu-weight-semibold);
+  letter-spacing: -0.02em;
+  color: var(--paperu-text);
+  margin: 0;
+  text-transform: lowercase;
+}
+
+.paperu-splash__rule {
+  width: 48px;
+  height: 1px;
+  background: var(--paperu-border-strong);
+  margin: var(--paperu-space-1) 0;
+}
+
+.paperu-splash__tagline {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paperu-text-subtle);
+  margin: 0;
+}
+
+.paperu-splash__status {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+  margin: var(--paperu-space-3) 0 0;
+  min-height: var(--paperu-text-base);
+}
+
+.paperu-splash__version {
+  position: fixed;
+  bottom: var(--paperu-space-5);
+  right: var(--paperu-space-5);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle);
+}
+
+.paperu-splash__title {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-lg);
+  font-weight: var(--paperu-weight-semibold);
+  color: var(--paperu-text);
+  margin: 0;
+  text-align: center;
+  max-width: 40ch;
+}
+
+.paperu-splash__actions {
+  display: flex;
+  gap: var(--paperu-space-3);
+  margin-top: var(--paperu-space-4);
+}
+
+/* Reduced motion — disable the fade-in (doctrine §7, §26). */
+@media (prefers-reduced-motion: reduce) {
+  .paperu-splash {
+    animation: none;
+  }
+}

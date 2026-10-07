@@ -369,6 +369,149 @@
   }
 }
 
+/* ── About (doctrine §73) ────────────────────────────────────────── */
+.paperu-about {
+  padding: var(--paperu-space-7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--paperu-space-2);
+  text-align: center;
+}
+.paperu-about__mark {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--paperu-radius-lg);
+  background: var(--paperu-accent);
+  color: var(--paperu-accent-foreground);
+  font-family: var(--paperu-font-serif);
+  font-weight: var(--paperu-weight-bold);
+  font-size: var(--paperu-text-2xl);
+  box-shadow: var(--paperu-shadow-sm);
+  margin-bottom: var(--paperu-space-3);
+}
+.paperu-about__name {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-xl);
+  font-weight: var(--paperu-weight-semibold);
+  margin: 0;
+}
+.paperu-about__version {
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+}
+.paperu-about__tagline {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--paperu-text-subtle);
+  margin: var(--paperu-space-2) 0 var(--paperu-space-4);
+}
+.paperu-about__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--paperu-space-3);
+  width: 100%;
+  max-width: 600px;
+  margin: var(--paperu-space-4) 0;
+  padding-top: var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+}
+.paperu-about__meta dt {
+  font-size: var(--paperu-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--paperu-text-subtle);
+  margin-bottom: 2px;
+}
+.paperu-about__meta dd {
+  margin: 0;
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text);
+}
+.paperu-about__copyright {
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+  margin: var(--paperu-space-3) 0 0;
+}
+.paperu-about__licence {
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle);
+  margin: 0;
+}
+.paperu-about__actions {
+  display: flex;
+  gap: var(--paperu-space-3);
+  margin-top: var(--paperu-space-4);
+}
+.paperu-about__privacy {
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle);
+  margin-top: var(--paperu-space-4);
+  padding-top: var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+  width: 100%;
+}
+
+/* ── Diagnostics (doctrine §74) ──────────────────────────────────── */
+.paperu-diagnostics {
+  padding: var(--paperu-space-6);
+}
+.paperu-diagnostics__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: var(--paperu-space-3);
+  margin: 0;
+}
+.paperu-diagnostics__meta dt {
+  font-size: var(--paperu-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--paperu-text-subtle);
+  margin-bottom: 2px;
+}
+.paperu-diagnostics__meta dd {
+  margin: 0;
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text);
+}
+.paperu-diagnostics__modules {
+  list-style: none;
+  padding: 0;
+  margin: var(--paperu-space-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-1);
+  max-height: 240px;
+  overflow-y: auto;
+}
+.paperu-diagnostics__module {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--paperu-space-1) var(--paperu-space-2);
+  border-radius: var(--paperu-radius-sm);
+  background: var(--paperu-surface-muted);
+  font-size: var(--paperu-text-sm);
+}
+.paperu-diagnostics__actions {
+  display: flex;
+  gap: var(--paperu-space-3);
+  margin-top: var(--paperu-space-5);
+}
+.paperu-diagnostics__privacy {
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle);
+  margin-top: var(--paperu-space-4);
+  padding-top: var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+}
+
 /* ── Universal Drop ─────────────────────────────────────────────── */
 .paperu-drop {
   display: flex;
