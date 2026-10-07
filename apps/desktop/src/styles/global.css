@@ -1,0 +1,93 @@
+/* Paperu — global stylesheet.
+ * Imports design tokens, UI primitives, and base element styling. */
+@import "@paperu/design-tokens/tokens.css";
+@import "@paperu/ui/styles.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--paperu-bg);
+  color: var(--paperu-text);
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-base);
+  line-height: var(--paperu-leading-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--paperu-font-serif);
+  color: var(--paperu-text);
+  margin: 0;
+  line-height: var(--paperu-leading-tight);
+}
+
+/* Sticky footer: the app shell uses flex column so the footer is
+ * pushed to the bottom naturally and never overlaps content. */
+.paperu-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.paperu-shell__main {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: var(--paperu-app-max-width);
+  margin: 0 auto;
+  padding: var(--paperu-space-6) var(--paperu-space-5);
+}
+.paperu-shell__footer {
+  flex-shrink: 0;
+}
+
+/* Screen-reader-only utility (mirror of the UI primitive). */
+.paperu-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Custom scrollbar for long lists. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--paperu-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--paperu-border-strong);
+  border-radius: var(--paperu-radius-pill);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--paperu-text-subtle);
+  background-clip: content-box;
+}

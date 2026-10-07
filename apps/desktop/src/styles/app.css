@@ -1,0 +1,304 @@
+/* Paperu — application component styles. */
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.paperu-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--paperu-z-sticky);
+  background: color-mix(in srgb, var(--paperu-bg) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--paperu-border);
+}
+.paperu-header__inner {
+  max-width: var(--paperu-app-max-width);
+  margin: 0 auto;
+  height: var(--paperu-header-height);
+  padding: 0 var(--paperu-space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--paperu-space-4);
+}
+.paperu-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-3);
+  text-decoration: none;
+  color: var(--paperu-text);
+}
+.paperu-brand__mark {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--paperu-radius-md);
+  background: var(--paperu-accent);
+  color: var(--paperu-accent-foreground);
+  font-family: var(--paperu-font-serif);
+  font-weight: var(--paperu-weight-bold);
+  font-size: var(--paperu-text-md);
+  box-shadow: var(--paperu-shadow-sm);
+}
+.paperu-brand__name {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-lg);
+  font-weight: var(--paperu-weight-semibold);
+  letter-spacing: 0.01em;
+}
+.paperu-appinfo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-2);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+}
+.paperu-appinfo__edition {
+  padding: 2px var(--paperu-space-2);
+  border-radius: var(--paperu-radius-pill);
+  background: var(--paperu-surface-muted);
+  border: 1px solid var(--paperu-border);
+  font-weight: var(--paperu-weight-semibold);
+  letter-spacing: 0.06em;
+}
+.paperu-appinfo__version {
+  font-family: var(--paperu-font-mono);
+}
+
+/* ── Inspect ────────────────────────────────────────────────────── */
+.paperu-inspect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-5);
+}
+.paperu-inspect__header h1 {
+  font-size: var(--paperu-text-2xl);
+}
+.paperu-inspect__lead {
+  margin: var(--paperu-space-2) 0 0;
+  color: var(--paperu-text-muted);
+  max-width: 60ch;
+}
+.paperu-inspect__status,
+.paperu-inspect__placeholder {
+  padding: var(--paperu-space-5);
+}
+.paperu-inspect__placeholder p {
+  margin: 0;
+  color: var(--paperu-text-muted);
+}
+.paperu-inspect__privacy {
+  margin: 0;
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle);
+}
+
+/* ── Dropzone ───────────────────────────────────────────────────── */
+.paperu-dropzone {
+  border: 1.5px dashed var(--paperu-border-strong);
+  border-radius: var(--paperu-radius-lg);
+  background: var(--paperu-surface);
+  padding: var(--paperu-space-7) var(--paperu-space-5);
+  text-align: center;
+  transition: border-color var(--paperu-duration-fast)
+      var(--paperu-ease-standard),
+    background var(--paperu-duration-fast) var(--paperu-ease-standard),
+    box-shadow var(--paperu-duration-fast) var(--paperu-ease-standard);
+}
+.paperu-dropzone.is-dragging {
+  border-color: var(--paperu-accent);
+  background: color-mix(in srgb, var(--paperu-accent) 6%, var(--paperu-surface));
+  box-shadow: var(--paperu-shadow-md);
+}
+.paperu-dropzone__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--paperu-space-3);
+}
+.paperu-dropzone__glyph {
+  font-size: 2.5rem;
+  line-height: 1;
+  color: var(--paperu-accent);
+  opacity: 0.85;
+}
+.paperu-dropzone__title {
+  margin: 0;
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-lg);
+  font-weight: var(--paperu-weight-semibold);
+}
+.paperu-dropzone__hint {
+  margin: 0;
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+}
+
+/* ── Result ─────────────────────────────────────────────────────── */
+.paperu-result {
+  padding: var(--paperu-space-6);
+}
+.paperu-result__head {
+  display: flex;
+  align-items: center;
+  gap: var(--paperu-space-3);
+  margin-bottom: var(--paperu-space-5);
+  flex-wrap: wrap;
+}
+.paperu-result__kind {
+  font-size: var(--paperu-text-xs);
+  font-weight: var(--paperu-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--paperu-accent);
+  padding: 2px var(--paperu-space-2);
+  border: 1px solid var(--paperu-border-strong);
+  border-radius: var(--paperu-radius-pill);
+  background: var(--paperu-surface-muted);
+}
+.paperu-result__name {
+  font-size: var(--paperu-text-xl);
+  word-break: break-all;
+}
+.paperu-result__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--paperu-space-4);
+  margin: 0;
+}
+.paperu-result__field {
+  min-width: 0;
+}
+.paperu-result__term {
+  font-size: var(--paperu-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paperu-text-subtle);
+  margin-bottom: var(--paperu-space-1);
+}
+.paperu-result__value {
+  margin: 0;
+  word-break: break-all;
+}
+.paperu-result__bytes {
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-sm);
+}
+.paperu-result__mime {
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-sm);
+}
+.paperu-result__path {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-sm);
+  background: var(--paperu-surface-muted);
+  padding: 2px var(--paperu-space-2);
+  border-radius: var(--paperu-radius-sm);
+  word-break: break-all;
+}
+.paperu-result__note {
+  margin: var(--paperu-space-5) 0 0;
+  padding-top: var(--paperu-space-4);
+  border-top: 1px solid var(--paperu-border);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-success);
+}
+
+/* ── Error ──────────────────────────────────────────────────────── */
+.paperu-error {
+  padding: var(--paperu-space-6);
+  border-left: 4px solid var(--paperu-destructive);
+}
+.paperu-error__head {
+  display: flex;
+  align-items: center;
+  gap: var(--paperu-space-3);
+  margin-bottom: var(--paperu-space-3);
+}
+.paperu-error__badge {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--paperu-radius-pill);
+  background: var(--paperu-destructive);
+  color: var(--paperu-destructive-foreground);
+  font-weight: var(--paperu-weight-bold);
+}
+.paperu-error__title {
+  font-size: var(--paperu-text-md);
+}
+.paperu-error__detail {
+  margin: 0 0 var(--paperu-space-4);
+  color: var(--paperu-text-muted);
+}
+.paperu-error__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--paperu-space-3);
+  margin: 0;
+}
+.paperu-error__meta dt {
+  font-size: var(--paperu-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paperu-text-subtle);
+  margin-bottom: 2px;
+}
+.paperu-error__meta dd {
+  margin: 0;
+  font-size: var(--paperu-text-sm);
+}
+.paperu-error__meta code {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  background: var(--paperu-surface-muted);
+  padding: 1px var(--paperu-space-2);
+  border-radius: var(--paperu-radius-xs);
+}
+.paperu-error__technical {
+  grid-column: 1 / -1;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────── */
+.paperu-footer {
+  border-top: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+}
+.paperu-footer__inner {
+  max-width: var(--paperu-app-max-width);
+  margin: 0 auto;
+  padding: var(--paperu-space-4) var(--paperu-space-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--paperu-space-4);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+}
+.paperu-footer__promise {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-2);
+}
+.paperu-footer__name {
+  font-family: var(--paperu-font-serif);
+  letter-spacing: 0.02em;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .paperu-shell__main {
+    padding: var(--paperu-space-5) var(--paperu-space-4);
+  }
+  .paperu-inspect__header h1 {
+    font-size: var(--paperu-text-xl);
+  }
+  .paperu-dropzone {
+    padding: var(--paperu-space-6) var(--paperu-space-4);
+  }
+  .paperu-footer__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--paperu-space-2);
+  }
+}

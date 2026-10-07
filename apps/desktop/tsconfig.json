@@ -1,0 +1,33 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@paperu/contracts": ["../../packages/contracts/src"],
+      "@paperu/contracts/*": ["../../packages/contracts/src/*"],
+      "@paperu/design-tokens": ["../../packages/design-tokens/src"],
+      "@paperu/design-tokens/*": ["../../packages/design-tokens/src/*"],
+      "@paperu/ui": ["../../packages/ui/src"],
+      "@paperu/test-fixtures": ["../../packages/test-fixtures/src"],
+      "@paperu/test-fixtures/*": ["../../packages/test-fixtures/src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.css",
+    "vite.config.ts",
+    "src/vite-env.d.ts"
+  ],
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/__tests__/**",
+    "src/test-setup.ts",
+    "dist",
+    "node_modules"
+  ]
+}
