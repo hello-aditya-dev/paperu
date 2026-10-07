@@ -1,0 +1,155 @@
+/* Paperu — History view styles (Master Prompt 3 §31). */
+
+.paperu-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-4);
+}
+
+.paperu-history__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--paperu-space-4);
+  padding-bottom: var(--paperu-space-3);
+  border-bottom: 1px solid var(--paperu-border);
+}
+
+.paperu-history__title {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-2xl);
+  font-weight: var(--paperu-weight-semibold);
+  margin: 0;
+}
+.paperu-history__subtitle {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+  margin: 4px 0 0;
+}
+
+.paperu-history__actions {
+  display: inline-flex;
+  gap: var(--paperu-space-2);
+}
+.paperu-history__action {
+  padding: 6px var(--paperu-space-3);
+  border-radius: var(--paperu-radius-md);
+  border: 1px solid var(--paperu-border);
+  background: var(--paperu-bg);
+  color: var(--paperu-text);
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  cursor: pointer;
+}
+.paperu-history__action:hover:not(:disabled) {
+  border-color: var(--paperu-border-strong);
+}
+.paperu-history__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.paperu-history__action--danger:not(:disabled):hover {
+  border-color: var(--paperu-danger, #c0392b);
+  color: var(--paperu-danger, #c0392b);
+}
+
+.paperu-history__notice {
+  padding: var(--paperu-space-3) var(--paperu-space-4);
+  border-radius: var(--paperu-radius-md);
+  background: var(--paperu-surface-muted);
+  border: 1px solid var(--paperu-border);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+}
+
+.paperu-history__empty {
+  padding: var(--paperu-space-8) var(--paperu-space-4);
+  text-align: center;
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-sm);
+  font-style: italic;
+}
+
+.paperu-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-1);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.paperu-history__item {
+  display: flex;
+  align-items: center;
+  gap: var(--paperu-space-3);
+  padding: var(--paperu-space-3) var(--paperu-space-4);
+  border-radius: var(--paperu-radius-md);
+  border: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+}
+.paperu-history__item:hover {
+  border-color: var(--paperu-border-strong);
+}
+
+.paperu-history__item-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.paperu-history__item-op {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-accent);
+  font-weight: var(--paperu-weight-semibold);
+}
+.paperu-history__item-file {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-md);
+  color: var(--paperu-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.paperu-history__item-meta {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-muted);
+}
+
+.paperu-history__item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--paperu-space-1);
+  flex-shrink: 0;
+}
+.paperu-history__btn {
+  padding: 4px var(--paperu-space-3);
+  border-radius: var(--paperu-radius-sm);
+  border: 1px solid var(--paperu-border);
+  background: var(--paperu-bg);
+  color: var(--paperu-text);
+  font-size: var(--paperu-text-sm);
+  cursor: pointer;
+}
+.paperu-history__btn:hover {
+  border-color: var(--paperu-border-strong);
+}
+.paperu-history__btn--quiet {
+  width: 28px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: none;
+  color: var(--paperu-text-muted);
+  font-size: var(--paperu-text-lg);
+}
+.paperu-history__btn--quiet:hover {
+  background: var(--paperu-surface-muted);
+  color: var(--paperu-danger, #c0392b);
+}
