@@ -294,3 +294,41 @@ comes later when a certificate exists.
 - Performance instrumentation — §64
 - Manual Windows smoke test (install + launch + use + close + reopen) — §28
 - Code signing (needs Authenticode certificate) — §13
+
+---
+Task ID: 7 — IPC CONVERGENCE + WINDOWS CI GREEN
+Agent: Builder (Z.ai Code)
+
+## Mission: Wire 7 Rust modules into typed Tauri commands — close the critical IPC gap.
+
+The previous sprint left 7 Rust logic modules (rename, citations, duplicate_finder, downloads_cleaner, organizer, file_rescue, archive_studio) with tests but NO Tauri command wrappers. The frontend couldn't invoke them at runtime. This sprint closes that gap.
+
+## What was done:
+1. Wrote 7 Tauri command wrapper files (all #![cfg(feature = "tauri-runtime")]):
+   - commands/rename.rs: preview_rename + execute_rename
+   - commands/citations.rs: save_citation + list_citations + delete_citation + format_citation
+   - commands/duplicate_finder.rs: find_exact_duplicates
+   - commands/downloads_cleaner.rs: scan_downloads_folder
+   - commands/organizer.rs: save/list/delete rules + dry_run_organizer
+   - commands/file_rescue.rs: diagnose_file
+   - commands/archive_studio.rs: validate_zip_entry + check_suspicious_ratio + check_destination_contained
+2. Registered 7 new modules in commands/mod.rs (feature-gated declarations + re-exports).
+3. Added 16 new commands to generate_handler! in lib.rs (full crate:: paths).
+4. Wrote 7 TS contract files (rename.ts, citations.ts, duplicate_finder.ts, downloads_cleaner.ts, organizer.ts, file_rescue.ts, archive_studio.ts) + exported from index.ts.
+5. Fixed OrganizerRule missing serde::Serialize (Windows Clippy failure).
+6. Fixed citations.ts unused FilePath import.
+
+## CI run 37673720669 — ALL GREEN:
+- Frontend: ✓ 42s (typecheck + lint + 110 tests + build)
+- Rust core: ✓ 49s (fmt + clippy + 80 tests)
+- Windows Tauri: ✓ 5m54s (clippy with tauri-runtime + tests with tauri-runtime + Tauri production build + artifact upload)
+
+## Windows artifact: paperu-windows-x64-fe33c60... (produced, uploaded, SHA-256 verified)
+
+## Final state:
+- agent/builder: fe33c60
+- 16 new Tauri commands registered and Windows-compiled
+- 7 Rust modules fully wired: logic → command → generate_handler! → frontend invoke
+- 7 TS contracts with typed wrappers
+- 80 Rust tests + 110 TS tests + clippy zero + fmt clean + build green
+- Windows installer artifact produced (unsigned, validation build)
