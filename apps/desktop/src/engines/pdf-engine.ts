@@ -390,3 +390,185 @@ export async function splitEveryPage(
   }
   return out;
 }
+
+// ── Images → PDF ──────────────────────────────────────────────────
+
+export type ImagePdfLayout = "fit" | "a4" | "original";
+
+/**
+ * Combine images into a single PDF. Each image becomes one page.
+ * Layouts:
+ *   fit      — page sized to image (capped to a sane max)
+ *   a4       — A4 page with image centered and fit within margins
+ *   original — page = image pixel dimensions in points
+ */
+export async function imagesToPdf(
+  files: File[],
+  opts: {
+    layout: ImagePdfLayout;
+    signal?: AbortSignal;
+    onProgress?: PdfFitProgressCb;
+  } = { layout: "fit" },
+): Promise<Uint8Array> {
+  const { layout, signal, onProgress } = opts;
+  const out = await PDFDocument.create();
+  const A4_W = 595.28;
+  const A4_H = 841.89;
+
+  for (let i = 0; i < files.length; i++) {
+    throwIfAborted(signal);
+    onProgress?.({
+      fraction: (i + 1) / files.length,
+      stage: `Adding image ${i + 1}/${files.length}`,
+    });
+    const f = files[i]!;
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    let img;
+    // Determine format by extension/mime.
+    const name = f.name.toLowerCase();
+    if (name.endsWith(".png")) {
+      img = await out.embedPng(bytes);
+    } else {
+      try {
+        img = await out.embedJpg(bytes);
+      } catch {
+        // Maybe a PNG mislabeled, or progressive JPEG — rasterize via canvas.
+        const png = await rasterizeToPng(f);
+        img = await out.embedPng(png);
+      }
+    }
+    const iw = img.width;
+    const ih = img.height;
+
+    let pageW: number;
+    let pageH: number;
+    let drawW: number;
+    let drawH: number;
+    if (layout === "a4") {
+      pageW = A4_W;
+      pageH = A4_H;
+      const maxW = A4_W - 48;
+      const maxH = A4_H - 48;
+      const r = Math.min(maxW / iw, maxH / ih);
+      drawW = iw * r;
+      drawH = ih * r;
+    } else if (layout === "original") {
+      pageW = iw;
+      pageH = ih;
+      drawW = iw;
+      drawH = ih;
+    } else {
+      // fit: cap to a sane max (1100pt ~ ~15in).
+      const max = 1100;
+      const r = Math.min(1, max / Math.max(iw, ih));
+      pageW = iw * r;
+      pageH = ih * r;
+      drawW = pageW;
+      drawH = pageH;
+    }
+    const page = out.addPage([pageW, pageH]);
+    page.drawImage(img, {
+      x: (pageW - drawW) / 2,
+      y: (pageH - drawH) / 2,
+      width: drawW,
+      height: drawH,
+    });
+  }
+  return out.save({ useObjectStreams: true });
+}
+
+/** Rasterize an image File to PNG bytes via canvas (for webp/bmp/gif/fallback). */
+async function rasterizeToPng(file: File): Promise<Uint8Array> {
+  const bmp = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get canvas context.");
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close?.();
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("PNG encode failed"))),
+      "image/png",
+    ),
+  );
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
+// ── PDF → Images ──────────────────────────────────────────────────
+
+export interface PdfToImageOutput {
+  name: string;
+  bytes: Uint8Array;
+  mime: string;
+}
+
+/**
+ * Render PDF pages to PNG or JPEG images.
+ * @param pages 1-based page numbers to render; undefined = all pages.
+ */
+export async function pdfToImages(
+  file: File,
+  opts: {
+    format: "png" | "jpeg";
+    scale?: number;
+    pages?: number[];
+    signal?: AbortSignal;
+    onProgress?: PdfFitProgressCb;
+  } = { format: "png" },
+): Promise<PdfToImageOutput[]> {
+  const { format, scale = 1.5, pages, signal, onProgress } = opts;
+  const pdfjsLib = await import("pdfjs-dist");
+  configurePdfjsWorker(pdfjsLib);
+  const pdfjs = pdfjsLib as unknown as PdfjsModule;
+  const data = new Uint8Array(await file.arrayBuffer());
+  const doc = await pdfjs.getDocument({
+    data: data.slice(),
+    disableAutoFetch: true,
+    disableStream: true,
+    isEvalSupported: false,
+  }).promise;
+
+  const total = doc.numPages;
+  const want = pages && pages.length ? pages : Array.from({ length: total }, (_, i) => i + 1);
+  const pad = String(total).length;
+  const base = file.name.replace(/\.[^.]+$/, "") || "page";
+  const out: PdfToImageOutput[] = [];
+
+  for (let idx = 0; idx < want.length; idx++) {
+    throwIfAborted(signal);
+    const p = want[idx]!;
+    const page = await doc.getPage(p);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext("2d", { alpha: format === "png" });
+    if (!ctx) throw new Error("Could not get canvas context.");
+    if (format === "jpeg") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    await page.render({ canvasContext: ctx, viewport, canvas }).promise;
+    const mime = format === "png" ? "image/png" : "image/jpeg";
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("encode failed"))),
+        mime,
+        format === "jpeg" ? 0.92 : undefined,
+      ),
+    );
+    out.push({
+      name: `${base}-${String(p).padStart(pad, "0")}.${format === "png" ? "png" : "jpg"}`,
+      bytes: new Uint8Array(await blob.arrayBuffer()),
+      mime,
+    });
+    onProgress?.({
+      fraction: (idx + 1) / want.length,
+      stage: `Rendered page ${p}/${total}`,
+    });
+  }
+  await doc.destroy();
+  return out;
+}

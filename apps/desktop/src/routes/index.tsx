@@ -8,6 +8,8 @@ import { PdfFitRoute } from "./PdfFitRoute";
 import { ImageFitRoute } from "./ImageFitRoute";
 import { PdfMergeRoute } from "./PdfMergeRoute";
 import { PdfSplitRoute } from "./PdfSplitRoute";
+import { ImagesToPdfRoute } from "./ImagesToPdfRoute";
+import { PdfToImagesRoute } from "./PdfToImagesRoute";
 
 /**
  * Hash router: Tauri serves the frontend from the local bundle, so
@@ -25,6 +27,8 @@ export const router = createHashRouter([
       { path: "image/fit", element: <ImageFitRoute /> },
       { path: "pdf/merge", element: <PdfMergeRoute /> },
       { path: "pdf/split", element: <PdfSplitRoute /> },
+      { path: "pdf/from-images", element: <ImagesToPdfRoute /> },
+      { path: "pdf/to-images", element: <PdfToImagesRoute /> },
     ],
   },
 ]);
