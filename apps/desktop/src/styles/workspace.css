@@ -1,0 +1,111 @@
+/* Paperu — Workspace shell styles (Master Prompt 3 §38-40). */
+
+.paperu-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-5);
+}
+
+.paperu-workspace__header {
+  padding-bottom: var(--paperu-space-3);
+  border-bottom: 1px solid var(--paperu-border);
+}
+.paperu-workspace__heading {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-2xl);
+  font-weight: var(--paperu-weight-semibold);
+  margin: 0;
+}
+.paperu-workspace__subtitle {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+  margin: 4px 0 0;
+}
+
+.paperu-workspace__empty {
+  padding: var(--paperu-space-8) var(--paperu-space-4);
+  text-align: center;
+  color: var(--paperu-text-muted);
+  font-style: italic;
+}
+
+.paperu-workspace__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--paperu-space-2);
+}
+
+.paperu-workspace__item {
+  margin: 0;
+}
+
+.paperu-workspace__tool {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--paperu-space-4);
+  padding: var(--paperu-space-4);
+  border-radius: var(--paperu-radius-md);
+  border: 1px solid var(--paperu-border);
+  background: var(--paperu-bg-elevated);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.paperu-workspace__tool:hover {
+  border-color: var(--paperu-border-strong);
+  background: var(--paperu-surface);
+}
+.paperu-workspace__tool:focus-visible {
+  outline: 2px solid var(--paperu-accent);
+  outline-offset: 1px;
+}
+
+.paperu-workspace__tool-glyph {
+  font-family: var(--paperu-font-serif);
+  font-size: var(--paperu-text-lg);
+  color: var(--paperu-accent);
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.paperu-workspace__tool-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.paperu-workspace__tool-label {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-md);
+  font-weight: var(--paperu-weight-semibold);
+  color: var(--paperu-text);
+}
+.paperu-workspace__tool-desc {
+  font-family: var(--paperu-font-sans);
+  font-size: var(--paperu-text-sm);
+  color: var(--paperu-text-muted);
+}
+.paperu-workspace__tool-advanced {
+  font-family: var(--paperu-font-mono);
+  font-size: var(--paperu-text-xs);
+  color: var(--paperu-text-subtle, var(--paperu-text-muted));
+  margin-top: 2px;
+}
+
+.paperu-workspace__tool-shortcut {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paperu-workspace__tool {
+    transition: none !important;
+  }
+}

@@ -6,6 +6,7 @@
 @import "./shelf.css";
 @import "./action-palette.css";
 @import "./history.css";
+@import "./workspace.css";
 
 *,
 *::before,

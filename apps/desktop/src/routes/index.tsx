@@ -18,6 +18,8 @@ import { HomeRoute } from "./HomeRoute";
 import { AboutRoute } from "./AboutRoute";
 import { DiagnosticsRoute } from "./DiagnosticsRoute";
 import { HistoryRoute } from "./HistoryRoute";
+import { PdfWorkspaceRoute } from "./PdfWorkspaceRoute";
+import { ImagesWorkspaceRoute } from "./ImagesWorkspaceRoute";
 
 // ── Lazy-loaded feature routes ────────────────────────────────────
 // These pull in the pdf-lib/pdfjs-dist/canvas engines. Splitting
@@ -73,6 +75,9 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <HomeRoute /> },
       { path: "inspect", element: withSuspense(<InspectRoute />) },
+      // Workspace shells (eager — small, no engine deps).
+      { path: "pdf", element: <PdfWorkspaceRoute /> },
+      { path: "images", element: <ImagesWorkspaceRoute /> },
       { path: "pdf/fit", element: withSuspense(<PdfFitRoute />) },
       { path: "image/fit", element: withSuspense(<ImageFitRoute />) },
       { path: "pdf/merge", element: withSuspense(<PdfMergeRoute />) },
