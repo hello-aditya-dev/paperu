@@ -5,6 +5,7 @@ import { App } from "@/app/App";
 import { HomeRoute } from "./HomeRoute";
 import { InspectRoute } from "./InspectRoute";
 import { PdfFitRoute } from "./PdfFitRoute";
+import { ImageFitRoute } from "./ImageFitRoute";
 
 /**
  * Hash router: Tauri serves the frontend from the local bundle, so
@@ -19,6 +20,7 @@ export const router = createHashRouter([
       { index: true, element: <HomeRoute /> },
       { path: "inspect", element: <InspectRoute /> },
       { path: "pdf/fit", element: <PdfFitRoute /> },
+      { path: "image/fit", element: <ImageFitRoute /> },
     ],
   },
 ]);
