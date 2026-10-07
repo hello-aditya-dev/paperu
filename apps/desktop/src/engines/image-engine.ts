@@ -354,6 +354,170 @@ export async function convertImage(
   return { bytes, format };
 }
 
+// ── Image adjustments (90% §32, Wave 3) — Canvas pixel manipulation ─
+
+export interface AdjustOptions {
+  /** Brightness: -100 (dark) to +100 (bright), 0 = unchanged. */
+  brightness?: number;
+  /** Contrast: -100 to +100, 0 = unchanged. */
+  contrast?: number;
+  /** Saturation: -100 (grayscale) to +100 (oversaturated), 0 = unchanged. */
+  saturation?: number;
+  /** If true, convert to grayscale (luminance). */
+  grayscale?: boolean;
+  /** If true, threshold to pure black & white (1-bit). */
+  blackAndWhite?: boolean;
+}
+
+/**
+ * Apply brightness/contrast/saturation/grayscale/B&W adjustments via
+ * per-pixel manipulation. All local — no uploads. Returns the modified
+ * bytes as JPEG (re-encoded; the original is never touched, source-safety §22).
+ */
+export async function adjustImage(
+  file: File,
+  opts: AdjustOptions,
+): Promise<{ bytes: Uint8Array; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for adjustments.");
+  ctx.drawImage(bmp, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  // Normalize adjustments to the [-1, 1] or multiplier range.
+  const b = (opts.brightness ?? 0) / 100; // -1..1, added to each channel
+  const c = (opts.contrast ?? 0) / 100; // -1..1
+  const contrastFactor = (1.0 + c) / (1.0 + (1.0 - c) * c); // tanh-like
+  const sat = 1.0 + (opts.saturation ?? 0) / 100; // 0..2
+  const gray = opts.grayscale ?? false;
+  const bw = opts.blackAndWhite ?? false;
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i]!;
+    let g = data[i + 1]!;
+    let bl = data[i + 2]!;
+    // Brightness: add a constant.
+    r += b * 255;
+    g += b * 255;
+    bl += b * 255;
+    // Contrast: scale around 128.
+    r = (r - 128) * contrastFactor + 128;
+    g = (g - 128) * contrastFactor + 128;
+    bl = (bl - 128) * contrastFactor + 128;
+    // Saturation: interpolate toward grayscale (luminance).
+    const lum = 0.299 * r + 0.587 * g + 0.114 * bl;
+    r = lum + (r - lum) * sat;
+    g = lum + (g - lum) * sat;
+    bl = lum + (bl - lum) * sat;
+    // Grayscale: collapse to luminance.
+    if (gray) {
+      r = g = bl = lum;
+    }
+    // Black & white: threshold the luminance.
+    if (bw) {
+      const v = lum > 128 ? 255 : 0;
+      r = g = bl = v;
+    }
+    // Clamp.
+    data[i] = Math.min(255, Math.max(0, r));
+    data[i + 1] = Math.min(255, Math.max(0, g));
+    data[i + 2] = Math.min(255, Math.max(0, bl));
+    // Alpha unchanged.
+  }
+  ctx.putImageData(imageData, 0, 0);
+  const blob = await canvasToBlob(canvas, "jpeg", 0.92);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, format: "jpeg" };
+}
+
+/**
+ * Flip an image horizontally and/or vertically. Returns PNG (lossless).
+ */
+export async function flipImage(
+  file: File,
+  opts: { horizontal?: boolean; vertical?: boolean },
+): Promise<{ bytes: Uint8Array; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for flipping.");
+  // Flip via transform: move to center, scale -1, draw back.
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.scale(opts.horizontal ? -1 : 1, opts.vertical ? -1 : 1);
+  ctx.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+  const blob = await canvasToBlob(canvas, "png", 1.0);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, format: "png" };
+}
+
+export interface WatermarkOptions {
+  text: string;
+  /** Opacity 0..1 (default 0.3). */
+  opacity?: number;
+  /** Font size in pixels (default 48). */
+  fontSize?: number;
+  /** Position: center (default), bottom-right, etc. */
+  position?: "center" | "bottom-right" | "bottom-left" | "top-right" | "top-left";
+}
+
+/**
+ * Burn a text watermark into the image. Re-encodes as JPEG (the watermark
+ * is permanent; the original is never touched, source-safety §22).
+ */
+export async function watermarkImage(
+  file: File,
+  opts: WatermarkOptions,
+): Promise<{ bytes: Uint8Array; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for watermarking.");
+  ctx.drawImage(bmp, 0, 0);
+  const fontSize = opts.fontSize ?? 48;
+  const opacity = opts.opacity ?? 0.3;
+  ctx.font = `${fontSize}px sans-serif`;
+  ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+  ctx.strokeStyle = `rgba(0, 0, 0, ${opacity})`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const metrics = ctx.measureText(opts.text);
+  const pad = fontSize;
+  const { x, y } = watermarkPosition(opts.position ?? "center", canvas.width, canvas.height, metrics.width, pad);
+  ctx.lineWidth = 2;
+  ctx.strokeText(opts.text, x, y);
+  ctx.fillText(opts.text, x, y);
+  const blob = await canvasToBlob(canvas, "jpeg", 0.92);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, format: "jpeg" };
+}
+
+function watermarkPosition(
+  pos: "center" | "bottom-right" | "bottom-left" | "top-right" | "top-left",
+  canvasW: number,
+  canvasH: number,
+  textWidth: number,
+  pad: number,
+): { x: number; y: number } {
+  switch (pos) {
+    case "bottom-right":
+      return { x: canvasW - textWidth / 2 - pad, y: canvasH - pad };
+    case "bottom-left":
+      return { x: textWidth / 2 + pad, y: canvasH - pad };
+    case "top-right":
+      return { x: canvasW - textWidth / 2 - pad, y: pad };
+    case "top-left":
+      return { x: textWidth / 2 + pad, y: pad };
+    default:
+      return { x: canvasW / 2, y: canvasH / 2 };
+  }
+}
+
 export interface ImageMetadata {
   width: number;
   height: number;

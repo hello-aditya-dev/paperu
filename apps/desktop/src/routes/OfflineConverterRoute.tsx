@@ -27,6 +27,9 @@ import {
   resizeImage,
   rotateImage,
   stripExif,
+  adjustImage,
+  flipImage,
+  watermarkImage,
   type ImageMetadata,
 } from "@/engines/image-engine";
 import {
@@ -39,13 +42,16 @@ import { readFileBytes } from "@/lib/file-picker";
 import { useRecentFiles } from "@/lib/recent-files";
 import { Button, Card } from "@paperu/ui";
 
-type Mode = "convert" | "resize" | "crop" | "rotate" | "inspect" | "strip";
+type Mode = "convert" | "resize" | "crop" | "rotate" | "inspect" | "strip" | "adjust" | "flip" | "watermark";
 
 const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
   { id: "convert", label: "Convert" },
   { id: "resize", label: "Resize" },
   { id: "crop", label: "Crop" },
   { id: "rotate", label: "Rotate" },
+  { id: "flip", label: "Flip" },
+  { id: "adjust", label: "Adjust" },
+  { id: "watermark", label: "Watermark" },
   { id: "inspect", label: "Inspect" },
   { id: "strip", label: "Strip metadata" },
 ];
@@ -85,6 +91,20 @@ export function OfflineConverterRoute(): React.ReactNode {
   const [cropH, setCropH] = useState("");
   // Rotate
   const [rotate, setRotate] = useState<90 | 180 | 270>(90);
+  // Flip
+  const [flipH, setFlipH] = useState(false);
+  const [flipV, setFlipV] = useState(false);
+  // Adjust (brightness/contrast/saturation/grayscale/B&W)
+  const [brightness, setBrightness] = useState(0);
+  const [contrast, setContrast] = useState(0);
+  const [saturation, setSaturation] = useState(0);
+  const [grayscale, setGrayscale] = useState(false);
+  const [blackAndWhite, setBlackAndWhite] = useState(false);
+  // Watermark
+  const [wmText, setWmText] = useState("Paperu");
+  const [wmOpacity, setWmOpacity] = useState(0.3);
+  const [wmSize, setWmSize] = useState(48);
+  const [wmPos, setWmPos] = useState<"center" | "bottom-right" | "bottom-left" | "top-right" | "top-left">("center");
 
   const addRecent = useRecentFiles((s) => s.add);
 
@@ -210,6 +230,42 @@ export function OfflineConverterRoute(): React.ReactNode {
     finally { setProcessing(false); }
   }
 
+  async function onFlip(): Promise<void> {
+    if (!flipH && !flipV) { setError("Choose horizontal or vertical flip."); return; }
+    setProcessing(true); setError(null); setOutput(null);
+    try {
+      const memFile = await getMemFile();
+      const res = await flipImage(memFile, { horizontal: flipH, vertical: flipV });
+      await finalize(res.bytes, "png", { format: "PNG" });
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setProcessing(false); }
+  }
+
+  async function onAdjust(): Promise<void> {
+    setProcessing(true); setError(null); setOutput(null);
+    try {
+      const memFile = await getMemFile();
+      const res = await adjustImage(memFile, {
+        brightness, contrast, saturation, grayscale, blackAndWhite,
+      });
+      await finalize(res.bytes, "jpg", { format: "JPEG" });
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setProcessing(false); }
+  }
+
+  async function onWatermark(): Promise<void> {
+    if (!wmText.trim()) { setError("Enter watermark text."); return; }
+    setProcessing(true); setError(null); setOutput(null);
+    try {
+      const memFile = await getMemFile();
+      const res = await watermarkImage(memFile, {
+        text: wmText, opacity: wmOpacity, fontSize: wmSize, position: wmPos,
+      });
+      await finalize(res.bytes, "jpg", { format: "JPEG" });
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setProcessing(false); }
+  }
+
   return (
     <section className="paperu-section" aria-labelledby="imgtool-heading">
       <header className="paperu-section__header">
@@ -306,6 +362,81 @@ export function OfflineConverterRoute(): React.ReactNode {
               ))}
             </div>
             <Button variant="accent" onClick={onRotate} disabled={processing} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>{processing ? "Rotating…" : "Rotate"}</Button>
+          </div>
+        </Card>
+      )}
+
+      {file && mode === "flip" && (
+        <Card>
+          <div style={{ padding: "var(--paperu-space-5)" }}>
+            <span className="paperu-text-label">Flip</span>
+            <div style={{ display: "flex", gap: "var(--paperu-space-3)", marginTop: "var(--paperu-space-2)" }}>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--paperu-space-2)" }}>
+                <input type="checkbox" checked={flipH} onChange={(e) => setFlipH(e.target.checked)} /> Horizontal
+              </label>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--paperu-space-2)" }}>
+                <input type="checkbox" checked={flipV} onChange={(e) => setFlipV(e.target.checked)} /> Vertical
+              </label>
+            </div>
+            <Button variant="accent" onClick={onFlip} disabled={processing} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>{processing ? "Flipping…" : "Flip"}</Button>
+          </div>
+        </Card>
+      )}
+
+      {file && mode === "adjust" && (
+        <Card>
+          <div style={{ padding: "var(--paperu-space-5)" }}>
+            <span className="paperu-text-label">Adjust (brightness / contrast / saturation)</span>
+            <div style={{ display: "grid", gap: "var(--paperu-space-3)", marginTop: "var(--paperu-space-2)" }}>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Brightness</span><span className="paperu-text-numeric">{brightness > 0 ? `+${brightness}` : brightness}</span></div>
+                <input type="range" min={-100} max={100} value={brightness} onChange={(e) => setBrightness(parseInt(e.target.value, 10))} style={{ width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Contrast</span><span className="paperu-text-numeric">{contrast > 0 ? `+${contrast}` : contrast}</span></div>
+                <input type="range" min={-100} max={100} value={contrast} onChange={(e) => setContrast(parseInt(e.target.value, 10))} style={{ width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Saturation</span><span className="paperu-text-numeric">{saturation > 0 ? `+${saturation}` : saturation}</span></div>
+                <input type="range" min={-100} max={100} value={saturation} onChange={(e) => setSaturation(parseInt(e.target.value, 10))} style={{ width: "100%" }} />
+              </div>
+              <div style={{ display: "flex", gap: "var(--paperu-space-3)" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--paperu-space-2)" }}>
+                  <input type="checkbox" checked={grayscale} onChange={(e) => setGrayscale(e.target.checked)} /> Grayscale
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--paperu-space-2)" }}>
+                  <input type="checkbox" checked={blackAndWhite} onChange={(e) => setBlackAndWhite(e.target.checked)} /> Black &amp; white
+                </label>
+              </div>
+            </div>
+            <Button variant="accent" onClick={onAdjust} disabled={processing} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>{processing ? "Adjusting…" : "Apply adjustments"}</Button>
+          </div>
+        </Card>
+      )}
+
+      {file && mode === "watermark" && (
+        <Card>
+          <div style={{ padding: "var(--paperu-space-5)" }}>
+            <span className="paperu-text-label">Text watermark</span>
+            <input className="paperu-target__input" placeholder="Watermark text" value={wmText} onChange={(e) => setWmText(e.target.value)} style={{ width: "100%", marginTop: "var(--paperu-space-2)" }} />
+            <div style={{ display: "grid", gap: "var(--paperu-space-3)", marginTop: "var(--paperu-space-3)" }}>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Opacity</span><span className="paperu-text-numeric">{Math.round(wmOpacity * 100)}%</span></div>
+                <input type="range" min={0.05} max={1} step={0.05} value={wmOpacity} onChange={(e) => setWmOpacity(parseFloat(e.target.value))} style={{ width: "100%" }} />
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}><span>Font size</span><span className="paperu-text-numeric">{wmSize}px</span></div>
+                <input type="range" min={16} max={120} value={wmSize} onChange={(e) => setWmSize(parseInt(e.target.value, 10))} style={{ width: "100%" }} />
+              </div>
+              <select className="paperu-target__input" value={wmPos} onChange={(e) => setWmPos(e.target.value as typeof wmPos)} style={{ width: "100%" }}>
+                <option value="center">Center</option>
+                <option value="bottom-right">Bottom right</option>
+                <option value="bottom-left">Bottom left</option>
+                <option value="top-right">Top right</option>
+                <option value="top-left">Top left</option>
+              </select>
+            </div>
+            <Button variant="accent" onClick={onWatermark} disabled={processing} style={{ width: "100%", marginTop: "var(--paperu-space-4)" }}>{processing ? "Watermarking…" : "Apply watermark"}</Button>
           </div>
         </Card>
       )}
