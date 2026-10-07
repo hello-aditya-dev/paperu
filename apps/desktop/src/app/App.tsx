@@ -36,6 +36,8 @@ const NAV: readonly NavItem[] = [
   { to: "/pdf/split", label: "Split / Extract", glyph: "⫻", shortcut: "5" },
   { to: "/pdf/from-images", label: "Images → PDF", glyph: "⋐", shortcut: "6" },
   { to: "/pdf/to-images", label: "PDF → Images", glyph: "⫾", shortcut: "7" },
+  { to: "/pdf/sign", label: "Sign PDF", glyph: "✎", shortcut: "8" },
+  { to: "/pdf/fill", label: "Fill PDF", glyph: "✦", shortcut: "9" },
 ];
 
 export function App(): React.ReactNode {
@@ -77,7 +79,7 @@ export function App(): React.ReactNode {
         }
       }
       const isMod = e.metaKey || e.ctrlKey;
-      if (isMod && /^[1-7]$/.test(e.key)) {
+      if (isMod && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         const idx = parseInt(e.key, 10) - 1;
         const item = NAV[idx];
