@@ -11,6 +11,9 @@ import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import { imagesToPdf, type ImagePdfLayout, type PdfFitProgress } from "@/engines/pdf-engine";
 
@@ -41,6 +44,19 @@ export function ImagesToPdfView(): React.ReactNode {
   const [state, setState] = useState<State>({ kind: "idle" });
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("image");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setImages((prev) => {
+        if (prev.some((f) => f.path === staged.path)) return prev;
+        return [...prev, { path: staged.path, result: staged }];
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +141,8 @@ export function ImagesToPdfView(): React.ReactNode {
         onProgress: (p) => setState({ kind: "running", progress: p }),
       });
       const finalized = await finalizeOutput(images[0]!.path, "-paperu", "pdf", pdfBytes);
+      // Stage the output for composable workflows (next action).
+      stage(finalized.output, "images-to-pdf", images[0]?.path);
       setState({
         kind: "done",
         outputPath: finalized.outputPath,
@@ -270,6 +288,7 @@ export function ImagesToPdfView(): React.ReactNode {
             <Button variant="outline" onClick={() => void revealPath(state.outputPath)}>Open folder</Button>
             <Button variant="ghost" onClick={reset}>Build another</Button>
           </div>
+          <NextActions exclude="images-to-pdf" />
         </Card>
       )}
 

@@ -10,6 +10,9 @@ import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import { pdfToImages, parsePageRanges, type PdfFitProgress } from "@/engines/pdf-engine";
 
@@ -33,6 +36,16 @@ export function PdfToImagesView(): React.ReactNode {
   const [rangeError, setRangeError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("pdf");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setState({ kind: "ready", file: staged });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,6 +140,10 @@ export function PdfToImagesView(): React.ReactNode {
       const ext = format === "png" ? "png" : "jpg";
       for (const o of outputs) {
         const finalized = await finalizeOutput(state.file.path, `-${o.name.replace(/\.[^.]+$/, "")}`, ext, o.bytes);
+        // Stage only the first output for composable workflows.
+        if (outputPaths.length === 0) {
+          stage(finalized.output, "pdf-to-images", state.file.path);
+        }
         outputPaths.push(finalized.outputPath);
       }
       setState({ kind: "done", outputs: outputPaths });
@@ -312,6 +329,7 @@ export function PdfToImagesView(): React.ReactNode {
             </Button>
             <Button variant="ghost" onClick={reset}>Render another</Button>
           </div>
+          <NextActions exclude="pdf-to-images" />
         </Card>
       )}
 

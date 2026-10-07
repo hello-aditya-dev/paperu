@@ -10,7 +10,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppError, InspectFileResponse } from "@paperu/contracts";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath, pdfPageCount } from "@/lib/ipc";
+import { useWorkingFile } from "@/lib/working-file";
+import { useStagedFile } from "@/hooks/useStagedFile";
+import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
 import {
   parsePageRanges,
@@ -38,8 +41,19 @@ export function PdfSplitView(): React.ReactNode {
   const [mode, setMode] = useState<Mode>("extract");
   const [rangeText, setRangeText] = useState("");
   const [rangeError, setRangeError] = useState<string | null>(null);
+  const [pageCount, setPageCount] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
+  const stage = useWorkingFile((s) => s.stage);
+
+  // Auto-load a staged working file if one exists (composable workflows).
+  const { staged } = useStagedFile("pdf");
+  useEffect(() => {
+    if (staged && state.kind === "idle") {
+      setState({ kind: "ready", file: staged });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +75,7 @@ export function PdfSplitView(): React.ReactNode {
 
   const handlePath = useCallback(async (path: string) => {
     setState({ kind: "inspecting", path });
+    setPageCount(null);
     try {
       const result = await inspectFile(path);
       if (result.kind !== "pdf") {
@@ -77,6 +92,13 @@ export function PdfSplitView(): React.ReactNode {
         return;
       }
       setState({ kind: "ready", file: result });
+      // Fetch the real page count for range validation (doctrine §9).
+      try {
+        const count = await pdfPageCount(path);
+        setPageCount(count);
+      } catch {
+        // Page count unavailable; validation will use a fallback.
+      }
     } catch (err) {
       setState({ kind: "error", error: err as AppError });
     }
@@ -98,11 +120,12 @@ export function PdfSplitView(): React.ReactNode {
     }
   }
 
-  // Live-parse ranges.
+  // Live-parse ranges against the real page count.
   const parsedIndices: number[] | null = (() => {
     if (mode !== "extract" || !rangeText.trim() || state.kind !== "ready") return null;
+    const bound = pageCount ?? 9999; // Fallback if page count unknown.
     try {
-      return parsePageRanges(rangeText, 9999); // We don't know page count without reading; use a high bound.
+      return parsePageRanges(rangeText, bound);
     } catch {
       return null;
     }
@@ -114,8 +137,9 @@ export function PdfSplitView(): React.ReactNode {
       setRangeError("Enter a page range like 1-3, 5.");
       return null;
     }
+    const bound = pageCount ?? 9999;
     try {
-      const indices = parsePageRanges(rangeText, 9999);
+      const indices = parsePageRanges(rangeText, bound);
       setRangeError(null);
       return indices;
     } catch (e) {
@@ -146,6 +170,8 @@ export function PdfSplitView(): React.ReactNode {
           onProgress: (p) => setState({ kind: "running", progress: p }),
         });
         const finalized = await finalizeOutput(state.file.path, "-extracted", "pdf", out);
+        // Stage the output for composable workflows (next action).
+        stage(finalized.output, "pdf-split", state.file.path);
         setState({ kind: "done", outputs: [finalized.outputPath], mode });
       } else {
         const parts = await splitEveryPage(file, {
@@ -160,6 +186,10 @@ export function PdfSplitView(): React.ReactNode {
             "pdf",
             parts[i]!,
           );
+          // Stage only the first output for composable workflows.
+          if (i === 0) {
+            stage(finalized.output, "pdf-split", state.file.path);
+          }
           outputs.push(finalized.outputPath);
         }
         setState({ kind: "done", outputs, mode });
@@ -179,6 +209,7 @@ export function PdfSplitView(): React.ReactNode {
     setState({ kind: "idle" });
     setRangeText("");
     setRangeError(null);
+    setPageCount(null);
   }
 
   return (
@@ -240,6 +271,9 @@ export function PdfSplitView(): React.ReactNode {
                 <div className="paperu-staged__sub">
                   <span className="paperu-staged__kind">PDF</span>
                   <span className="paperu-staged__size">{state.file.size.humanReadable}</span>
+                  {pageCount != null && (
+                    <span className="paperu-text-numeric">{pageCount} page{pageCount === 1 ? "" : "s"}</span>
+                  )}
                 </div>
               </div>
               <button type="button" className="paperu-staged__remove" onClick={reset} aria-label="Remove file">✕</button>
@@ -265,11 +299,13 @@ export function PdfSplitView(): React.ReactNode {
 
               {mode === "extract" ? (
                 <>
-                  <label className="paperu-target__label" htmlFor="ranges">Pages to extract</label>
+                  <label className="paperu-target__label" htmlFor="ranges">
+                    Pages to extract{pageCount != null ? ` (1–${pageCount})` : ""}
+                  </label>
                   <input
                     id="ranges"
                     className="paperu-target__input"
-                    placeholder="e.g. 1-3, 5, 8-10"
+                    placeholder={pageCount != null ? `e.g. 1-3, 5, 8-${pageCount}` : "e.g. 1-3, 5, 8-10"}
                     value={rangeText}
                     onChange={(e) => { setRangeText(e.target.value); setRangeError(null); }}
                     aria-invalid={!!rangeError}
@@ -364,6 +400,7 @@ export function PdfSplitView(): React.ReactNode {
             </Button>
             <Button variant="ghost" onClick={reset}>Split another</Button>
           </div>
+          <NextActions exclude="pdf-split" />
         </Card>
       )}
     </section>

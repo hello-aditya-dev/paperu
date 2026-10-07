@@ -215,6 +215,23 @@ export async function openPath(path: string): Promise<void> {
   await call<void>("open_path", { request: { path } });
 }
 
+// ── pdf_page_count (Builder-added command) ────────────────────────
+
+/** Response from the pdf_page_count command. */
+export interface PdfPageCountResponse {
+  readonly pageCount: number | null;
+}
+
+/**
+ * Get the page count of a local PDF. Returns null if the count could
+ * not be determined. Used by the Split view to validate page ranges.
+ */
+export async function pdfPageCount(path: string): Promise<number | null> {
+  const args: Record<string, unknown> = { request: { path } };
+  const res = await call<PdfPageCountResponse>("pdf_page_count", args);
+  return res.pageCount;
+}
+
 /**
  * Inspect multiple local files. Returns one result per path, preserving
  * order. Each file is inspected independently; a failure on one file does

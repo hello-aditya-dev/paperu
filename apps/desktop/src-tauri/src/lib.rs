@@ -68,6 +68,7 @@ pub mod state;
 mod runtime {
     use crate::commands::finalize::finalize_output;
     use crate::commands::inspect::inspect_file;
+    use crate::commands::pdf_info::pdf_page_count;
     use crate::commands::read_app_info;
     use crate::commands::read_file::read_file_bytes;
     use crate::commands::settings::{read_settings, write_settings};
@@ -126,6 +127,7 @@ mod runtime {
                 inspect_file,
                 finalize_output,
                 read_file_bytes,
+                pdf_page_count,
                 reveal_path,
                 open_path,
                 read_settings,

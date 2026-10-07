@@ -4,6 +4,7 @@
 @import "@paperu/design-tokens/tokens.css";
 @import "@paperu/ui/styles.css";
 @import "./typography.css";
+@import "./nextactions.css";
 
 *,
 *::before,
