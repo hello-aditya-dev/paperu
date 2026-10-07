@@ -92,3 +92,45 @@ Stage Summary:
   - §64 Performance instrumentation
   - §109 Final polish pass
 - Hard environment blockers unchanged: no webkit2gtk (can't build Tauri shell), no Windows runner (can't trigger Windows CI). All non-Tauri-runtime gates are green.
+
+---
+Task ID: 3
+Agent: Builder (Z.ai Code, sandbox environment — authenticated with PAT)
+Task: Finalize Master Prompt 3 sprint — workspaces shell, docs, final gate run.
+
+Work Log:
+- Built WorkspaceShell component (editorial list of a workspace's modules).
+- Added PdfWorkspaceRoute (/pdf) and ImagesWorkspaceRoute (/images).
+- Reorganized the module registry + nav rail per Master Prompt §38: nav rail reduced from 10 items to 4 (Home / Recent work / PDF / Images). The 8 individual tools moved to visibleInNav: false but kept their Ctrl+1..9 shortcuts (handler looks up by module.shortcut field, not nav position).
+- Removed legacy 'history' module entry (route collision with 'recent-work' on /history).
+- Added workspace.css with warm-paper editorial card layout, blue glyph accent, focus states.
+- Ran the FULL final gate set on agent/builder @ 8d5040c:
+  - TS typecheck: ✅ green (5 packages)
+  - ESLint: ✅ green (5 packages, --max-warnings 0)
+  - TS tests: ✅ 110 tests pass in 9 files
+  - cargo fmt --check: ✅ green
+  - cargo clippy -D warnings: ✅ zero warnings
+  - cargo test: ✅ 27 Rust tests pass
+  - Frontend production build: ✅ green, ~115 kB gzip initial JS
+- Appended 'BUILDER HANDOFF — Master Prompt 3' section to AGENT_HANDOFF.md (Integrator-owned; clearly labeled as Builder's update for review). Maps every delivered feature to its Master Prompt 3 section. Honest list of what's NOT done.
+- Appended 'Master Prompt 3 additions' section to KNOWN_LIMITATIONS.md documenting the 9 new limitations (shelf session-scoped, recent_work metadata-only, lazy-route 1-frame fallback, pdf-engine 179 kB gzip lazy, Save As not implemented, lifecycle stubbed, perf instrumentation absent, action palette not yet global-shortcut-wired, future-module stubs).
+
+Stage Summary:
+- agent/builder final state: `8d5040c07de0c0b24cb21be2347799bf5bb032d2` on origin.
+- 13 coherent commits past `20a67fad` baseline (all pushed to origin/agent/builder):
+  1. fc6566a refactor(registry): drive nav from module catalogue + Command Center + Shelf foundation
+  2. 58fca5b merge feature/mature-core-ux-foundation
+  3. 631daf7 feat(command): Command Center CSS + 11 deterministic-search tests
+  4. 7de46c1 merge feature/mature-core-ux-styling
+  5. d8435eb fix(types): remove unused helper/import, fix shelf-store array swap
+  6. c31a4ad test(command): fix two assertion invariants + add nav/Command visibility tests
+  7. b40dfda feat(history): persistent recent work store (migration 0002) — Rust side
+  8. a2b07c6 feat(history): HistoryRoute + persistent recent-work frontend
+  9. 3d57f32 feat(actions): Smart Action Palette (third core UX pillar)
+  10. bf9cff0 perf(startup): lazy-load heavy feature routes + History CSS
+  11. 4bb1025 docs(worklog): record Builder Master Prompt 3 progress
+  12. 05c2a52 feat(workspaces): PDF + Images workspace shells, slim nav rail
+  13. 8d5040c docs(handoff): record Builder Master Prompt 3 handoff + new limitations
+- Final gate counts: 110 TS tests (was 86) + 27 Rust tests (was 22), all green. clippy zero warnings. Initial bundle ~115 kB gzip (was ~395 kB).
+- NOT done (honest, documented in AGENT_HANDOFF.md + KNOWN_LIMITATIONS.md): Save As (Tauri dialog), Simple Mode toggle, desktop lifecycle (single instance, open-file arg, window state), shutdown/crash-marker, performance instrumentation, final 20-min manual polish pass.
+- Hard blockers unchanged: no webkit2gtk (Tauri shell not buildable), no Windows runner (Windows CI not triggerable). All non-Tauri-runtime gates green.
