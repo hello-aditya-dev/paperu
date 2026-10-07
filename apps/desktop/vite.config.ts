@@ -56,10 +56,10 @@ export default defineConfig({
   test: {
     globals: true,
     // Use happy-dom instead of jsdom: jsdom 30 has a webidl
-    // incompatibility with vitest's VM pools
-    // ("webidl.util.markAsUncloneable is not a function").
+    // threads pool supports dynamic imports (needed for lazy-loaded routes)
+    
     environment: "happy-dom",
-    pool: "vmThreads",
+    pool: "threads",
     setupFiles: ["./src/test-setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     coverage: {
