@@ -46,6 +46,7 @@
 )]
 #![allow(clippy::multiple_crate_versions)]
 
+pub mod application_kit;
 pub mod commands;
 pub mod contracts;
 pub mod database;
@@ -54,7 +55,9 @@ pub mod errors;
 pub mod filesystem;
 pub mod licensing;
 pub mod logging;
+pub mod notes;
 pub mod product;
+pub mod reading_history;
 pub mod recent_work;
 pub mod security;
 pub mod settings;

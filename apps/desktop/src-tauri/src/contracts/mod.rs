@@ -10,14 +10,20 @@
 //!   2. An updated JSON fixture.
 //!   3. Integrator sign-off (contracts are Integrator-owned).
 
+pub mod application_kit;
 pub mod common;
 pub mod inspect;
+pub mod notes;
+pub mod reading_history;
 pub mod recent_work;
 pub mod settings;
 pub mod tasks;
 
+pub use application_kit::*;
 pub use common::*;
 pub use inspect::*;
+pub use notes::*;
+pub use reading_history::*;
 pub use recent_work::*;
 pub use settings::*;
 pub use tasks::*;

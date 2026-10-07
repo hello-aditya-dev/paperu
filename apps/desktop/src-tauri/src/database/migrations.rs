@@ -31,10 +31,25 @@ const MIGRATIONS: &[Migration] = &[
         label: "recent_work",
         sql: include_str!("../../migrations/0002_recent_work.sql"),
     },
+    Migration {
+        version: 3,
+        label: "application_kit",
+        sql: include_str!("../../migrations/0003_application_kit.sql"),
+    },
+    Migration {
+        version: 4,
+        label: "notes",
+        sql: include_str!("../../migrations/0004_notes.sql"),
+    },
+    Migration {
+        version: 5,
+        label: "reading_history",
+        sql: include_str!("../../migrations/0005_reading_history.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 2;
+pub const LATEST_VERSION: u32 = 5;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {

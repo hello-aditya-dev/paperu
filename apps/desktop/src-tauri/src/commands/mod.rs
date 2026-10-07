@@ -11,20 +11,32 @@
 //! `tauri-runtime` feature. Without it, the functions are plain
 //! Rust functions testable on any platform.
 
+#[cfg(feature = "tauri-runtime")]
+pub mod application_kit;
 pub mod finalize;
 pub mod inspect;
+#[cfg(feature = "tauri-runtime")]
+pub mod notes;
 pub mod pdf_info;
 pub mod read_file;
+#[cfg(feature = "tauri-runtime")]
+pub mod reading_history;
 #[cfg(feature = "tauri-runtime")]
 pub mod recent_work;
 #[cfg(feature = "tauri-runtime")]
 pub mod settings;
 pub mod shell;
 
+#[cfg(feature = "tauri-runtime")]
+pub use application_kit::*;
 pub use finalize::*;
 pub use inspect::*;
+#[cfg(feature = "tauri-runtime")]
+pub use notes::*;
 pub use pdf_info::*;
 pub use read_file::*;
+#[cfg(feature = "tauri-runtime")]
+pub use reading_history::*;
 #[cfg(feature = "tauri-runtime")]
 pub use recent_work::*;
 #[cfg(feature = "tauri-runtime")]
