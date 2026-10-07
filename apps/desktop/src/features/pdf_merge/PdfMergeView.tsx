@@ -12,6 +12,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { inspectFile, readFileBytes, finalizeOutput, openPath, revealPath } from "@/lib/ipc";
 import { useWorkingFile } from "@/lib/working-file";
+import { useRecentFiles } from "@/lib/recent-files";
 import { useStagedFile } from "@/hooks/useStagedFile";
 import { NextActions } from "@/components/NextActions";
 import { Card, Button } from "@paperu/ui";
@@ -43,6 +44,7 @@ export function PdfMergeView(): React.ReactNode {
   const abortRef = useRef<AbortController | null>(null);
   const unlistenRef = useRef<UnlistenFn | null>(null);
   const stage = useWorkingFile((s) => s.stage);
+  const addRecent = useRecentFiles((s) => s.add);
 
   // Auto-load a staged working file if one exists (composable workflows).
   const { staged } = useStagedFile("pdf");
@@ -147,6 +149,15 @@ export function PdfMergeView(): React.ReactNode {
       );
       // Stage the output for composable workflows (next action).
       stage(finalized.output, "pdf-merge", files[0]?.path);
+      // Add to recent files.
+      addRecent({
+        path: finalized.outputPath,
+        fileName: finalized.output.fileName,
+        kind: finalized.output.kind,
+        humanReadableSize: finalized.output.size.humanReadable,
+        operation: "Merged PDFs",
+        timestamp: Date.now(),
+      });
       setState({
         kind: "done",
         outputPath: finalized.outputPath,
