@@ -12,16 +12,29 @@
  */
 
 import type {
+  AddApplicationKitItemRequest,
   AddRecentWorkRequest,
   AppError,
   AppInfo,
+  ApplicationKitItem,
+  CreateNoteFolderRequest,
+  CreateNoteRequest,
   InspectFileResponse,
+  Note,
+  NoteFolder,
+  ReadingHistoryEntry,
   RecentWorkEntry,
   Settings,
   SettingsPatch,
+  UpdateApplicationKitItemRequest,
+  UpdateNoteRequest,
+  UpdateReadingHistoryRequest,
 } from "@paperu/contracts";
 import {
+  ApplicationKitCommand,
   CommandName,
+  NotesCommand,
+  ReadingHistoryCommand,
   RecentWorkCommand,
   isAppError,
   appError as buildAppError,
@@ -303,6 +316,117 @@ export async function removeRecentWork(id: string): Promise<void> {
 /** Clear all recent-work entries. */
 export async function clearRecentWork(): Promise<void> {
   await call<null>(RecentWorkCommand.Clear);
+}
+
+// ── Application kit ──────────────────────────────────────────────
+
+/** Add a new application kit item. Returns the inserted item. */
+export async function addApplicationKitItem(
+  request: AddApplicationKitItemRequest,
+): Promise<ApplicationKitItem> {
+  return call<ApplicationKitItem>(ApplicationKitCommand.Add, { request });
+}
+
+/** List all application kit items, grouped by kind. */
+export async function listApplicationKitItems(): Promise<ApplicationKitItem[]> {
+  return call<ApplicationKitItem[]>(ApplicationKitCommand.List);
+}
+
+/** Update an existing kit item. Only provided fields are updated. */
+export async function updateApplicationKitItem(
+  request: UpdateApplicationKitItemRequest,
+): Promise<ApplicationKitItem> {
+  return call<ApplicationKitItem>(ApplicationKitCommand.Update, { request });
+}
+
+/** Remove a single kit item by id. */
+export async function removeApplicationKitItem(id: string): Promise<void> {
+  await call<null>(ApplicationKitCommand.Remove, { id });
+}
+
+// ── Notes ────────────────────────────────────────────────────────
+
+/** Create a new note. Returns the inserted note. */
+export async function createNote(request: CreateNoteRequest): Promise<Note> {
+  return call<Note>(NotesCommand.Create, { request });
+}
+
+/** List notes (most-recent-first). includeDeleted=false by default. */
+export async function listNotes(includeDeleted = false): Promise<Note[]> {
+  return call<Note[]>(NotesCommand.List, { includeDeleted });
+}
+
+/** Get a single note by id. */
+export async function getNote(id: string): Promise<Note> {
+  return call<Note>(NotesCommand.Get, { id });
+}
+
+/** Autosave a note. Only provided fields update. */
+export async function updateNote(request: UpdateNoteRequest): Promise<Note> {
+  return call<Note>(NotesCommand.Update, { request });
+}
+
+/** Soft-delete a note (moves to "recently deleted"). */
+export async function softDeleteNote(id: string): Promise<void> {
+  await call<null>(NotesCommand.SoftDelete, { id });
+}
+
+/** Restore a soft-deleted note. */
+export async function restoreNote(id: string): Promise<void> {
+  await call<null>(NotesCommand.Restore, { id });
+}
+
+/** Permanently delete notes whose deletedAt < olderThanIso. Returns count. */
+export async function purgeDeletedNotes(olderThanIso: string): Promise<number> {
+  return call<number>(NotesCommand.PurgeDeleted, { olderThanIso });
+}
+
+/** Create a note folder. */
+export async function createNoteFolder(
+  request: CreateNoteFolderRequest,
+): Promise<NoteFolder> {
+  return call<NoteFolder>(NotesCommand.CreateFolder, { request });
+}
+
+/** List all note folders. */
+export async function listNoteFolders(): Promise<NoteFolder[]> {
+  return call<NoteFolder[]>(NotesCommand.ListFolders);
+}
+
+/** Local search across note title, body, tags. No AI. */
+export async function searchNotes(query: string): Promise<Note[]> {
+  return call<Note[]>(NotesCommand.Search, { query });
+}
+
+// ── Reading history ──────────────────────────────────────────────
+
+/** Upsert reading-history for a path (called on open/scroll). */
+export async function upsertReadingHistory(
+  request: UpdateReadingHistoryRequest,
+): Promise<ReadingHistoryEntry> {
+  return call<ReadingHistoryEntry>(ReadingHistoryCommand.Upsert, { request });
+}
+
+/** Get reading-history for a file path (null if absent). */
+export async function getReadingHistory(
+  path: string,
+): Promise<ReadingHistoryEntry | null> {
+  return call<ReadingHistoryEntry | null>(ReadingHistoryCommand.Get, { path });
+}
+
+/** List all reading-history entries, most-recently-opened-first. */
+export async function listReadingHistory(): Promise<ReadingHistoryEntry[]> {
+  return call<ReadingHistoryEntry[]>(ReadingHistoryCommand.List);
+}
+
+/** Remove a single reading-history entry by id. */
+export async function removeReadingHistory(id: string): Promise<void> {
+  await call<null>(ReadingHistoryCommand.Remove, { id });
+}
+
+/** Clear all reading-history entries. */
+export async function clearReadingHistory(): Promise<void> {
+  await call<null>(ReadingHistoryCommand.Clear);
 }
 
 // ── Core call ────────────────────────────────────────────────────

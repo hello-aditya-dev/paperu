@@ -54,6 +54,41 @@ const FillPdfRoute = lazy(() =>
   import("./FillPdfRoute").then((m) => ({ default: m.FillPdfRoute })),
 );
 
+// ── Master Prompt 4 consumer routes (all lazy) ──────────────────
+const AssignmentStudioRoute = lazy(() =>
+  import("./AssignmentStudioRoute").then((m) => ({
+    default: m.AssignmentStudioRoute,
+  })),
+);
+const PortalReadyRoute = lazy(() =>
+  import("./PortalReadyRoute").then((m) => ({ default: m.PortalReadyRoute })),
+);
+const ApplicationKitRoute = lazy(() =>
+  import("./ApplicationKitRoute").then((m) => ({
+    default: m.ApplicationKitRoute,
+  })),
+);
+const StudyReaderRoute = lazy(() =>
+  import("./StudyReaderRoute").then((m) => ({ default: m.StudyReaderRoute })),
+);
+const NotesRoute = lazy(() =>
+  import("./NotesRoute").then((m) => ({ default: m.NotesRoute })),
+);
+const PrintStudioRoute = lazy(() =>
+  import("./PrintStudioRoute").then((m) => ({
+    default: m.PrintStudioRoute,
+  })),
+);
+const BatchStudioRoute = lazy(() =>
+  import("./BatchStudioRoute").then((m) => ({ default: m.BatchStudioRoute })),
+);
+const PaperuSendRoute = lazy(() =>
+  import("./PaperuSendRoute").then((m) => ({ default: m.PaperuSendRoute })),
+);
+const OnboardingRoute = lazy(() =>
+  import("./OnboardingRoute").then((m) => ({ default: m.OnboardingRoute })),
+);
+
 /** A minimal loading fallback for lazy routes. */
 function RouteLoading(): React.ReactNode {
   return (
@@ -95,6 +130,23 @@ export const router = createHashRouter([
       { path: "about", element: <AboutRoute /> },
       { path: "diagnostics", element: <DiagnosticsRoute /> },
       { path: "history", element: <HistoryRoute /> },
+      // ── Master Prompt 4 consumer routes (lazy) ─────────────────
+      {
+        path: "assignment",
+        element: withSuspense(<AssignmentStudioRoute />),
+      },
+      { path: "portal", element: withSuspense(<PortalReadyRoute />) },
+      { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
+      {
+        path: "reader",
+        element: withSuspense(<StudyReaderRoute path={null} />),
+      },
+      { path: "reader/:path", element: withSuspense(<StudyReaderRoute path={null} />) },
+      { path: "notes", element: withSuspense(<NotesRoute />) },
+      { path: "print", element: withSuspense(<PrintStudioRoute />) },
+      { path: "batch", element: withSuspense(<BatchStudioRoute />) },
+      { path: "send", element: withSuspense(<PaperuSendRoute />) },
+      { path: "onboarding", element: withSuspense(<OnboardingRoute />) },
     ],
   },
 ]);
