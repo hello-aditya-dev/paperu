@@ -70,27 +70,46 @@ the workspace relies on pnpm's `workspace:*` protocol.
 
 ## Feature scope
 
-### No real processing engines implemented yet
+### Wave-1 processing engines (webview-side, pending native optimization)
 
-The `apps/desktop/src-tauri/src/engines/mod.rs` module is a
-placeholder. It exposes a single constant:
+Paperu's Wave-1 processing engines run in the Tauri webview using
+`pdf-lib` (MIT) and `pdfjs-dist` (Apache-2.0), both permissively
+licensed. The engines are implemented in
+`apps/desktop/src/engines/pdf-engine.ts` and
+`apps/desktop/src/engines/image-engine.ts`. They are wired through
+the canonical Tauri command layer (`finalize_output`,
+`read_file_bytes`) which uses the non-destructive
+`TempWorkspace` + `atomic_finalize` path.
 
-```rust
-pub const ENGINES_AVAILABLE: bool = false;
-```
+The following Wave-1 features are implemented and passing the gate:
 
-Future engines (PDF compress, image resize, metadata removal,
-signing, etc.) will live behind this module, wired into the task
-runner, and speak the typed operation contracts defined in
-`packages/contracts/src/operations.ts`. The contracts already
-define the request/response shapes for these operations; the
-implementations do not yet exist.
+1. **Universal Drop** — multi-file inspect via canonical `inspect_file`.
+2. **PDF Make It Fit** — staged compression (lossless structural →
+   rasterize-last), bounded binary search, honest result reporting.
+3. **Image Make It Fit** — JPEG/PNG/WebP, binary-search quality +
+   dimensions, transparency preserved for PNG.
+4. **PDF Merge** — multi-file, reorder, honest "DONE" (no fake
+   reduction).
+5. **PDF Split / Extract** — range parser, strict validation,
+   split-all.
+6. **Images → PDF** — fit/A4/original layouts, reorder.
+7. **PDF → Images** — PNG/JPEG, configurable scale, page ranges.
+8. **Sign PDF** — electronic signature placement (not PKI).
+9. **Fill / Annotate** — text/date/checkbox overlays on any PDF.
 
-Any operation that would require an engine must return
-`internal.not_implemented` rather than pretending to succeed. See
-`docs/architecture/engines.md` for the integration plan.
+All operations are:
+- Local-first (no uploads, no network).
+- Non-destructive (source untouched, atomic finalization).
+- Cancellable (AbortController).
+- Output-validated (PDF parsed, image decoded before success).
 
-### Only Local File Inspect is implemented as a real proof
+The Rust `engines/` module (`ENGINES_AVAILABLE = false`) remains a
+placeholder for future native Rust engines. The webview engines are
+designed to be replaceable by native engines without touching
+contracts or UI. See `docs/decisions/0011-pdf-lib-pdfjs-dependency-request.md`
+for the dependency request.
+
+### Local File Inspect
 
 The first end-to-end real capability is **Local File Inspect**: the
 user selects or drops a file, the path goes through the typed IPC
@@ -99,11 +118,27 @@ displays the file name, extension, byte size, human-readable size,
 path and timestamps. The source file is never modified. Zero bytes
 are uploaded. See `docs/features/local-file-inspect.md`.
 
-The other operations in `packages/contracts/src/operations.ts`
-(`pdf.compress`, `pdf.merge`, `pdf.split`, `image.resize`,
-`metadata.remove`, `sign.apply`, etc.) are **contract shapes only**.
-They are defined so that future engines can conform to them, not
-because they are implemented.
+### Wave-1 known gaps
+
+The following are known gaps in the Wave-1 implementation, tracked
+for future improvement:
+
+- **PDF page count not shown in Split** — the split view validates
+  ranges against a high bound (9999) because page count is not read
+  upfront. A `pdf_page_count` Rust command would fix this.
+- **Sign/Fill page preview uses `canvas.toDataURL()`** — works but is
+  memory-heavy for large PDFs. A future optimization would render to
+  an offscreen canvas and display via `drawImage`.
+- **pdfjs-dist worker CSP** — the current CSP `script-src 'self'` may
+  need `worker-src 'self'` for the pdfjs worker. If not added, pdfjs
+  falls back to main-thread rendering (slower but functional).
+- **No "Save As" dialog** — outputs are saved automatically next to
+  the source with conflict-renaming. A `dialog:allow-save` capability
+  would enable explicit "Save As".
+- **No font bundling** — the typography system uses system font
+  fallbacks. Font bundling requires Integrator license verification.
+- **No visual regression tests** — golden screenshots are not yet
+  implemented (Guardian domain).
 
 ### Task engine is a foundation, not a full scheduler
 
