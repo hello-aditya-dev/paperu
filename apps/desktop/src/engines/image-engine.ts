@@ -226,3 +226,153 @@ export async function fitImageToSize(
     meta: { stepsTried, strategy },
   };
 }
+
+// ── Image utilities (32→50 sprint: resize, crop, rotate, convert, metadata) ─
+
+export interface ResizeOptions {
+  width?: number;
+  height?: number;
+  preserveAspectRatio?: boolean;
+}
+
+export async function resizeImage(
+  file: File,
+  opts: ResizeOptions,
+): Promise<{ bytes: Uint8Array; width: number; height: number; format: string }> {
+  const bmp = await loadBitmap(file);
+  let targetW = opts.width ?? bmp.width;
+  let targetH = opts.height ?? bmp.height;
+  if (opts.preserveAspectRatio ?? true) {
+    const ratio = bmp.width / bmp.height;
+    if (opts.width && !opts.height) {
+      targetH = Math.round(opts.width / ratio);
+    } else if (opts.height && !opts.width) {
+      targetW = Math.round(opts.height * ratio);
+    } else if (opts.width && opts.height) {
+      // Fit within both dimensions preserving aspect ratio.
+      const scaleW = opts.width / bmp.width;
+      const scaleH = opts.height / bmp.height;
+      const scale = Math.min(scaleW, scaleH);
+      targetW = Math.round(bmp.width * scale);
+      targetH = Math.round(bmp.height * scale);
+    }
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for resizing.");
+  ctx.drawImage(bmp, 0, 0, targetW, targetH);
+  const blob = await canvasToBlob(canvas, "png", 1.0);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, width: targetW, height: targetH, format: "png" };
+}
+
+export async function cropImage(
+  file: File,
+  crop: { x: number; y: number; width: number; height: number },
+): Promise<{ bytes: Uint8Array; width: number; height: number; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = crop.width;
+  canvas.height = crop.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for cropping.");
+  ctx.drawImage(
+    bmp,
+    crop.x, crop.y, crop.width, crop.height,
+    0, 0, crop.width, crop.height,
+  );
+  const blob = await canvasToBlob(canvas, "png", 1.0);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, width: crop.width, height: crop.height, format: "png" };
+}
+
+export async function rotateImage(
+  file: File,
+  degrees: 90 | 180 | 270,
+): Promise<{ bytes: Uint8Array; width: number; height: number; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  if (degrees === 90 || degrees === 270) {
+    canvas.width = bmp.height;
+    canvas.height = bmp.width;
+  } else {
+    canvas.width = bmp.width;
+    canvas.height = bmp.height;
+  }
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for rotation.");
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((degrees * Math.PI) / 180);
+  ctx.drawImage(bmp, -bmp.width / 2, -bmp.height / 2);
+  const blob = await canvasToBlob(canvas, "png", 1.0);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return {
+    bytes,
+    width: canvas.width,
+    height: canvas.height,
+    format: "png",
+  };
+}
+
+export async function convertImage(
+  file: File,
+  format: "jpeg" | "png" | "webp",
+  quality = 0.92,
+): Promise<{ bytes: Uint8Array; format: string }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for conversion.");
+  ctx.drawImage(bmp, 0, 0);
+  const blob = await canvasToBlob(canvas, format, quality);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  return { bytes, format };
+}
+
+export interface ImageMetadata {
+  width: number;
+  height: number;
+  hasExif: boolean;
+  hasGps: boolean;
+  format: string;
+}
+
+export async function inspectImageMetadata(file: File): Promise<ImageMetadata> {
+  const bmp = await loadBitmap(file);
+  // Canvas re-encoding strips EXIF/GPS by default — the original file
+  // may have metadata, but the re-encoded output won't.
+  // For real EXIF inspection, we'd need an EXIF parser library.
+  // For now, detect EXIF presence via magic bytes.
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const hasExif = buf.length >= 4 && buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xE1;
+  return {
+    width: bmp.width,
+    height: bmp.height,
+    hasExif,
+    hasGps: hasExif, // conservative: if EXIF exists, GPS might be there
+    format: file.type || "unknown",
+  };
+}
+
+export async function stripExif(file: File): Promise<{ bytes: Uint8Array; format: string; removed: string[] }> {
+  const bmp = await loadBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bmp.width;
+  canvas.height = bmp.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Paperu couldn't get a canvas context for metadata stripping.");
+  ctx.drawImage(bmp, 0, 0);
+  // Re-encoding via canvas strips ALL metadata (EXIF, GPS, camera info).
+  // The output is a clean image with no embedded metadata.
+  const blob = await canvasToBlob(canvas, "jpeg", 0.95);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const meta = await inspectImageMetadata(file);
+  const removed: string[] = [];
+  if (meta.hasExif) removed.push("EXIF camera metadata");
+  if (meta.hasGps) removed.push("GPS location data");
+  return { bytes, format: "jpeg", removed };
+}
