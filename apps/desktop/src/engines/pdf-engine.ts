@@ -20,7 +20,7 @@
  * file is read read-only; the output is a new file.
  */
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, degrees, rgb, StandardFonts } from "pdf-lib";
 
 /** Minimal typed interface for the pdfjs-dist module we use. */
 interface PdfjsModule {
@@ -571,4 +571,185 @@ export async function pdfToImages(
   }
   await doc.destroy();
   return out;
+}
+
+// ── Sign PDF (electronic signature placement) ────────────────────
+
+export interface SignaturePlacement {
+  /** 1-based page number. */
+  page: number;
+  /** Position in PDF points from bottom-left. */
+  x: number;
+  y: number;
+  /** Display width in points. */
+  width: number;
+  /** Display height in points. */
+  height: number;
+}
+
+/**
+ * Place a signature image (PNG with transparency) onto a PDF page.
+ *
+ * This is an ELECTRONIC SIGNATURE — a visible signature image placed
+ * on the document. It is NOT a PKI/certificate digital signature.
+ * The doctrine §16: 'Do not call it a PKI digital signature.'
+ */
+export async function signPdf(
+  file: File,
+  signaturePng: Uint8Array,
+  placement: SignaturePlacement,
+  opts: { signal?: AbortSignal; onProgress?: PdfFitProgressCb } = {},
+): Promise<Uint8Array> {
+  const { signal, onProgress } = opts;
+  onProgress?.({ fraction: 0.1, stage: "Opening PDF…" });
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const pages = doc.getPageCount();
+  if (placement.page < 1 || placement.page > pages)
+    throw new Error(`Page ${placement.page} is out of bounds (1–${pages}).`);
+  const img = await doc.embedPng(signaturePng);
+  const page = doc.getPage(placement.page - 1);
+  throwIfAborted(signal);
+  onProgress?.({ fraction: 0.5, stage: "Placing signature…" });
+  page.drawImage(img, {
+    x: placement.x,
+    y: placement.y,
+    width: placement.width,
+    height: placement.height,
+    rotate: degrees(0),
+  });
+  onProgress?.({ fraction: 1, stage: "Done" });
+  return doc.save({ useObjectStreams: true });
+}
+
+// ── Fill / Annotate (overlay text/date/checkbox) ──────────────────
+
+export type OverlayKind = "text" | "date" | "check";
+
+export interface OverlayItem {
+  id: string;
+  kind: OverlayKind;
+  page: number;
+  x: number;
+  y: number;
+  text?: string;
+  fontSize?: number;
+  size?: number;
+}
+
+/**
+ * Overlay text, dates, or checkboxes onto PDF pages. Works on any PDF,
+ * including non-fillable ones (overlays are drawn on top of the page
+ * content, not into AcroForm fields).
+ */
+export async function fillPdf(
+  file: File,
+  overlays: OverlayItem[],
+  opts: { signal?: AbortSignal; onProgress?: PdfFitProgressCb } = {},
+): Promise<Uint8Array> {
+  const { signal, onProgress } = opts;
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const pages = doc.getPages();
+
+  for (let i = 0; i < overlays.length; i++) {
+    throwIfAborted(signal);
+    const o = overlays[i]!;
+    if (o.page < 1 || o.page > pages.length) continue;
+    const page = pages[o.page - 1]!;
+    const color = rgb(0, 0, 0);
+    if (o.kind === "text" || o.kind === "date") {
+      const text =
+        o.kind === "date"
+          ? o.text || new Date().toLocaleDateString("en-IN")
+          : o.text || "";
+      page.drawText(text, {
+        x: o.x,
+        y: o.y,
+        size: o.fontSize || 12,
+        font,
+        color,
+      });
+    } else if (o.kind === "check") {
+      const s = o.size || 14;
+      page.drawRectangle({
+        x: o.x,
+        y: o.y,
+        width: s,
+        height: s,
+        borderColor: color,
+        borderWidth: 1.2,
+      });
+      page.drawLine({
+        start: { x: o.x + 2, y: o.y + 2 },
+        end: { x: o.x + s - 2, y: o.y + s - 2 },
+        thickness: 1.2,
+        color,
+      });
+      page.drawLine({
+        start: { x: o.x + s - 2, y: o.y + 2 },
+        end: { x: o.x + 2, y: o.y + s - 2 },
+        thickness: 1.2,
+        color,
+      });
+    }
+    onProgress?.({
+      fraction: (i + 1) / overlays.length,
+      stage: `Placing field ${i + 1}`,
+    });
+  }
+  return doc.save({ useObjectStreams: true });
+}
+
+// ── Render a single PDF page to a canvas (for preview) ────────────
+
+export interface PageRenderResult {
+  canvas: HTMLCanvasElement;
+  /** Page width in PDF points. */
+  widthPt: number;
+  /** Page height in PDF points. */
+  heightPt: number;
+  /** Render scale (pixels per point). */
+  scale: number;
+}
+
+/**
+ * Render a single PDF page to a canvas for preview. Used by Sign and
+ * Fill to show the page and let the user click to place overlays.
+ */
+export async function renderPdfPage(
+  file: File,
+  page: number,
+  maxWidth = 640,
+): Promise<PageRenderResult> {
+  const pdfjsLib = await import("pdfjs-dist");
+  configurePdfjsWorker(pdfjsLib);
+  const pdfjs = pdfjsLib as unknown as PdfjsModule;
+  const data = new Uint8Array(await file.arrayBuffer());
+  const doc = await pdfjs.getDocument({
+    data: data.slice(),
+    disableAutoFetch: true,
+    disableStream: true,
+    isEvalSupported: false,
+  }).promise;
+  const p = await doc.getPage(page);
+  const vp1 = p.getViewport({ scale: 1 });
+  const scale = Math.min(1, maxWidth / vp1.width);
+  const viewport = p.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext("2d", { alpha: false });
+  if (!ctx) throw new Error("Could not get canvas context.");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  await p.render({ canvasContext: ctx, viewport, canvas }).promise;
+  await doc.destroy();
+  return {
+    canvas,
+    widthPt: vp1.width,
+    heightPt: vp1.height,
+    scale,
+  };
 }
