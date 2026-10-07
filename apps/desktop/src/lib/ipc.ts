@@ -132,6 +132,14 @@ export interface FinalizeOutputResponse {
  * non-destructive atomic-finalization path. The output is written next
  * to the source file with `-{suffix}.{ext}` appended, conflict-renamed.
  * The source is never modified.
+ *
+ * Architecture guard (master prompt §9): a bare basename like
+ * `document.pdf` is NOT a valid native source path. The Rust
+ * `finalize_output` command validates absolute paths, but we reject
+ * basenames here too — earlier, with a clearer error — so the broken
+ * pattern can never silently reach the engine. A valid native path
+ * (Windows `C:\\Users\\…` or Unix `/home/…`) always contains at least
+ * one path separator; a basename contains neither `/` nor `\\`.
  */
 export async function finalizeOutput(
   sourcePath: string,
@@ -139,6 +147,17 @@ export async function finalizeOutput(
   extension: string,
   bytes: Uint8Array,
 ): Promise<FinalizeOutputResponse> {
+  if (!isAbsoluteNativePath(sourcePath)) {
+    throw buildAppError({
+      code: ErrorCode.InvalidInput,
+      category: ErrorCategory.Validation,
+      severity: ErrorSeverity.Error,
+      recoverability: Recoverability.ActionRequired,
+      message: "Paperu can't finalize a file without its real location.",
+      detail: "The source path looks like a filename only — Paperu needs the full path on this PC.",
+      technical: `finalizeOutput rejected non-absolute sourcePath: ${JSON.stringify(sourcePath)}`,
+    });
+  }
   const bytesBase64 = bytesToBase64(bytes);
   const args: Record<string, unknown> = {
     request: {
@@ -149,6 +168,20 @@ export async function finalizeOutput(
     },
   };
   return call<FinalizeOutputResponse>("finalize_output", args);
+}
+
+/**
+ * A native absolute path always contains at least one path separator
+ * (`/` on Unix, `\\` on Windows, plus drive letters). A bare basename
+ * like `document.pdf` contains neither — it is the broken pattern the
+ * master prompt §6-8 flagged. This guard is platform-agnostic: it
+ * rejects basenames while accepting both Unix and Windows absolute
+ * paths. It does NOT validate the path exists (that's the Rust side's
+ * job); it only catches the basename regression.
+ */
+function isAbsoluteNativePath(p: string): boolean {
+  if (typeof p !== "string" || p.length === 0) return false;
+  return p.includes("/") || p.includes("\\");
 }
 
 /** Encode a Uint8Array as a base64 string (for IPC transfer). */
