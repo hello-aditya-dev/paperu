@@ -68,6 +68,7 @@ pub mod logging;
 pub mod notes;
 #[allow(clippy::all)]
 pub mod organizer;
+pub mod pdf_native;
 pub mod product;
 pub mod reading_history;
 pub mod recent_work;
@@ -130,6 +131,8 @@ mod runtime {
                     app_data_dir,
                 };
                 app.manage(state);
+                // Watch Folders state (notify-debouncer watcher).
+                app.manage(crate::commands::watch::WatchState::default());
 
                 tracing::info!(version = env!("CARGO_PKG_VERSION"), "Paperu started");
                 Ok(())
@@ -188,6 +191,13 @@ mod runtime {
                 crate::commands::archive_studio::list_archive,
                 crate::commands::archive_studio::extract_archive,
                 crate::commands::archive_studio::create_archive,
+                crate::commands::pdf_native::rotate_pdf_pages,
+                crate::commands::pdf_native::delete_pdf_pages,
+                crate::commands::pdf_native::extract_pdf_pages,
+                crate::commands::pdf_native::pdf_native_page_count,
+                crate::commands::watch::start_watch_folder,
+                crate::commands::watch::stop_watch_folder,
+                crate::commands::watch::current_watch_folder,
             ])
             .run(tauri::generate_context!())
             .expect("Paperu failed to start");

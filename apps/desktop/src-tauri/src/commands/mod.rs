@@ -30,6 +30,8 @@ pub mod notes;
 #[cfg(feature = "tauri-runtime")]
 pub mod organizer;
 pub mod pdf_info;
+#[cfg(feature = "tauri-runtime")]
+pub mod pdf_native;
 pub mod read_file;
 #[cfg(feature = "tauri-runtime")]
 pub mod reading_history;
@@ -41,6 +43,8 @@ pub mod save_as;
 #[cfg(feature = "tauri-runtime")]
 pub mod settings;
 pub mod shell;
+#[cfg(feature = "tauri-runtime")]
+pub mod watch;
 
 #[cfg(feature = "tauri-runtime")]
 pub use application_kit::*;
@@ -61,6 +65,8 @@ pub use notes::*;
 #[cfg(feature = "tauri-runtime")]
 pub use organizer::*;
 pub use pdf_info::*;
+#[cfg(feature = "tauri-runtime")]
+pub use pdf_native::*;
 pub use read_file::*;
 #[cfg(feature = "tauri-runtime")]
 pub use reading_history::*;
@@ -72,6 +78,8 @@ pub use save_as::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
 pub use shell::*;
+#[cfg(feature = "tauri-runtime")]
+pub use watch::*;
 
 use serde::Serialize;
 

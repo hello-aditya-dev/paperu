@@ -53,6 +53,9 @@ const SignPdfRoute = lazy(() =>
 const FillPdfRoute = lazy(() =>
   import("./FillPdfRoute").then((m) => ({ default: m.FillPdfRoute })),
 );
+const PdfPageOpsRoute = lazy(() =>
+  import("./PdfPageOpsRoute").then((m) => ({ default: m.PdfPageOpsRoute })),
+);
 
 // ── Master Prompt 4 consumer routes (all lazy) ──────────────────
 const AssignmentStudioRoute = lazy(() =>
@@ -149,6 +152,7 @@ export const router = createHashRouter([
       },
       { path: "pdf/sign", element: withSuspense(<SignPdfRoute />) },
       { path: "pdf/fill", element: withSuspense(<FillPdfRoute />) },
+      { path: "pdf/pages", element: withSuspense(<PdfPageOpsRoute />) },
       { path: "about", element: <AboutRoute /> },
       { path: "diagnostics", element: <DiagnosticsRoute /> },
       { path: "history", element: <HistoryRoute /> },

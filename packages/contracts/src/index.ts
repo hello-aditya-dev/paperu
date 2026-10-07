@@ -27,3 +27,5 @@ export * from "./downloads_cleaner.js";
 export * from "./organizer.js";
 export * from "./file_rescue.js";
 export * from "./archive_studio.js";
+export * from "./pdf_native.js";
+export * from "./watch.js";

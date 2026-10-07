@@ -33,9 +33,9 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | PDF Password | ABSENT | no | — | — | — | — | — | encrypt/decrypt |
 | PDF Watermark | ABSENT | no | — | — | — | — | — | text/opacity/placement |
 | PDF Page Numbers | ABSENT | no | — | — | — | — | — | bottom center/right, start value |
-| PDF Rotate | ABSENT | no | — | — | — | — | — | 90/180/270 |
+| PDF Rotate | USEFUL | yes | ✅ pdf-page-ops (90/180/270, all or selected) | ✅ lopdf (MIT) | — | ✅ Rust (9 pdf_native tests) | ✅ | per-page rotate |
 | PDF Crop | ABSENT | no | — | — | — | — | — | page-level crop |
-| PDF Reorder | ABSENT | no | — | — | — | — | — | drag-reorder pages |
+| PDF Reorder | ABSENT | no | — | — | — | — | — | drag-reorder pages (needs page-tree rebuild) |
 
 ## Image + Metadata/Privacy
 | Feature | Status | Available | Frontend | Backend | Tests | Windows Compile | Remaining |
@@ -92,7 +92,7 @@ Statuses: ABSENT | SHELL | FOUNDATION | WORKING | USEFUL | AUTOMATED VERIFIED | 
 | Recipes | ABSENT | no | — | — | — | — | — | reusable workflow definitions |
 | Local Backup Recipes | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | dry-run, run, verify |
 | Timer Jobs | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | schedule eval, execution history |
-| Watch Folders | SHELL | no | ✅ stub | ✅ schema | ✅ SQLite | — | ✅ | watcher, debounce, loop prevention |
+| Watch Folders | USEFUL | yes | ✅ live event feed + start/stop | ✅ notify (CC0) + notify-debouncer-mini (MIT/Apache) | ✅ SQLite (rules schema) | — | ✅ | wire events to non-destructive recipes |
 | USB / Drive Toolbox | SHELL | no | ✅ stub | — | — | — | ✅ | copy+verify+checksum |
 
 ## Commercial / Platform

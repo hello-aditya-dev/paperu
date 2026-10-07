@@ -30,6 +30,7 @@ import type {
   Note,
   NoteFolder,
   OrganizerRule,
+  PdfNativeResponse,
   ReadingHistoryEntry,
   RecentWorkEntry,
   RescueDiagnosis,
@@ -47,9 +48,11 @@ import {
   DuplicateCommand,
   NotesCommand,
   OrganizerCommand,
+  PdfNativeCommand,
   ReadingHistoryCommand,
   RecentWorkCommand,
   RescueCommand,
+  WatchCommand,
   isAppError,
   appError as buildAppError,
   ErrorCategory,
@@ -239,7 +242,7 @@ export async function readFileBytes(path: string): Promise<Uint8Array> {
 }
 
 /** Decode a base64 string into a Uint8Array. */
-function base64ToBytes(s: string): Uint8Array {
+export function base64ToBytes(s: string): Uint8Array {
   const cleaned = s.replace(/[\s]/g, "");
   const len = cleaned.length;
   const out = new Uint8Array((len * 3) / 4);
@@ -466,6 +469,65 @@ export async function extractArchive(path: string, dest: string): Promise<Extrac
 export async function createArchive(archivePath: string, files: readonly string[]): Promise<CreateResult> {
   return call<CreateResult>(ArchiveCommand.Create, { archivePath, files });
 }
+
+// ── PDF page operations (Rust-native, lopdf) ──────────────────────
+
+/**
+ * Rotate pages of a PDF. `angle` is 90/180/270; `pages` is 1-based,
+ * empty = all pages. Returns the modified bytes (base64) + the page
+ * count. The frontend finalizes via finalizeOutput(absoluteSourcePath, …).
+ * Source-safety: the original is never modified.
+ */
+export async function rotatePdfPages(
+  path: string,
+  angle: number,
+  pages: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Rotate, { path, angle, pages });
+}
+
+/** Delete the specified 1-based pages from a PDF. Returns the modified bytes. */
+export async function deletePdfPages(
+  path: string,
+  pages: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Delete, { path, pages });
+}
+
+/** Keep ONLY the specified 1-based pages (delete the complement). Returns the modified bytes. */
+export async function extractPdfPages(
+  path: string,
+  pages: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Extract, { path, pages });
+}
+
+/** Get the page count of a local PDF. */
+export async function pdfNativePageCount(path: string): Promise<number> {
+  return call<number>(PdfNativeCommand.PageCount, { path });
+}
+
+// ── Watch Folders (notify + debouncer) ────────────────────────────
+
+/** Start watching a folder (recursive, debounced 400ms). Emits
+ *  `paperu://watch-event` for each change. Replaces any existing watcher.
+ *  Paperu takes NO destructive automatic action — the frontend decides. */
+export async function startWatchFolder(path: string): Promise<void> {
+  await call<null>(WatchCommand.Start, { path });
+}
+
+/** Stop the active watcher (if any). Safe to call when none is active. */
+export async function stopWatchFolder(): Promise<void> {
+  await call<null>(WatchCommand.Stop);
+}
+
+/** Returns the currently-watched path (null if none). */
+export async function currentWatchFolder(): Promise<string | null> {
+  return call<string | null>(WatchCommand.Current);
+}
+
+// NOTE: `base64ToBytes` already exists above (near readFileBytes) —
+// the PdfPageOpsRoute imports it from there. No duplicate here.
 
 // ── Notes ────────────────────────────────────────────────────────
 

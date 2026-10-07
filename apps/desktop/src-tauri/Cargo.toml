@@ -57,6 +57,16 @@ chrono = { version = "0.4", features = ["serde"] }
 # is_suspicious_ratio guards for ZIP-Slip + decompression-bomb safety.
 zip = { version = "2", default-features = false, features = ["deflate", "time"] }
 
+# PDF page operations (rotate/delete/extract) — OSS harvest (lopdf, MIT).
+# Unlocks 3 ABSENT features. Pure Rust; loads PDFs, manipulates the page
+# tree, saves via save_to(writer). No C++ bundling needed.
+lopdf = { version = "0.45", default-features = false }
+
+# Watch Folders — filesystem watching (OSS harvest, notify CC0 + MIT/Apache).
+# The standard Rust fs-watcher; uses ReadDirectoryChangesW on Windows.
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+notify-debouncer-mini = { version = "0", default-features = false }
+
 # Tauri runtime (optional — enables the desktop shell + IPC commands)
 tauri = { version = "2.12", features = [], optional = true }
 tauri-plugin-dialog = { version = "2.8", optional = true }
