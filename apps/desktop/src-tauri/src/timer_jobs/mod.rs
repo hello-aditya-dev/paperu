@@ -415,11 +415,10 @@ pub fn compute_next_occurrence(
     tz: &str,
     from: DateTime<Utc>,
 ) -> Option<DateTime<Utc>> {
+    let tz: chrono_tz::Tz = tz.parse().ok()?;
     match kind {
         "one_time" => {
             let t = parse_iso(expr).ok()?;
-            // One-time schedules in the past return None (the job is
-            // expired; the scheduler will skip + record it).
             if t < from {
                 None
             } else {
@@ -428,15 +427,11 @@ pub fn compute_next_occurrence(
         }
         "daily" => {
             let (h, m) = parse_hhmm(expr).ok()?;
-            // For V1: timezone-aware daily — convert HH:MM in the given
-            // TZ to UTC. Without chrono-tz we only support "UTC" and
-            // "local" (system offset). IANA names are treated as UTC.
-            let today = next_daily(from, h, m, tz)?;
-            Some(today)
+            next_daily_tz(from, h, m, tz)
         }
         "weekly" => {
             let (wd, h, m) = parse_weekly(expr).ok()?;
-            Some(next_weekly(from, wd, h, m, tz)?)
+            next_weekly_tz(from, wd, h, m, tz)
         }
         _ => None,
     }
@@ -444,33 +439,40 @@ pub fn compute_next_occurrence(
 
 /// Compute the daily occurrence: today at HH:MM (in the configured TZ),
 /// or tomorrow if that time has passed.
-fn next_daily(from: DateTime<Utc>, h: u32, m: u32, _tz: &str) -> Option<DateTime<Utc>> {
-    // V1: treat HH:MM as UTC. (A full IANA TZ resolver would shift
-    // this; the contract is that the schedule fires at HH:MM UTC.)
-    let today_naive = from.naive_utc().date().and_hms_opt(h, m, 0)?;
-    let today_utc = Utc.from_utc_datetime(&today_naive);
-    if today_utc > from {
-        Some(today_utc)
-    } else {
-        Some(today_utc + chrono::Duration::days(1))
+fn next_daily_tz(from: DateTime<Utc>, h: u32, m: u32, tz: chrono_tz::Tz) -> Option<DateTime<Utc>> {
+    let local_from = from.with_timezone(&tz);
+    for delta in 0..=2 {
+        let local_date = local_from.date_naive() + chrono::Duration::days(delta);
+        let local_naive = local_date.and_hms_opt(h, m, 0)?;
+        if let Some(dt) = tz.from_local_datetime(&local_naive).single() {
+            let utc = dt.with_timezone(&Utc);
+            if utc > from {
+                return Some(utc);
+            }
+        }
     }
+    None
 }
 
-/// Compute the next weekly occurrence: the next matching weekday at HH:MM.
-fn next_weekly(
+fn next_weekly_tz(
     from: DateTime<Utc>,
     target_wd: Weekday,
     h: u32,
     m: u32,
-    _tz: &str,
+    tz: chrono_tz::Tz,
 ) -> Option<DateTime<Utc>> {
-    let today_naive = from.naive_utc().date().and_hms_opt(h, m, 0)?;
-    let today_utc: DateTime<Utc> = Utc.from_utc_datetime(&today_naive);
-    // Walk forward up to 7 days to find the target weekday at HH:MM.
-    for delta in 0..=7 {
-        let candidate = today_utc + chrono::Duration::days(delta);
-        if candidate.weekday() == target_wd && candidate > from {
-            return Some(candidate);
+    let local_from = from.with_timezone(&tz);
+    for delta in 0..=14 {
+        let local_date = local_from.date_naive() + chrono::Duration::days(delta);
+        if local_date.weekday() != target_wd {
+            continue;
+        }
+        let local_naive = local_date.and_hms_opt(h, m, 0)?;
+        if let Some(dt) = tz.from_local_datetime(&local_naive).single() {
+            let utc = dt.with_timezone(&Utc);
+            if utc > from {
+                return Some(utc);
+            }
         }
     }
     None

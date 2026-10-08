@@ -90,6 +90,12 @@ image = { version = "0.25", default-features = false, features = [
 # We bundle DejaVu Sans Bold (Bitstream license) — see assets/fonts/.
 ab_glyph = "0.2"
 
+# IANA timezone database for Timer Jobs (Prompt 02 §10.1).
+# chrono-tz is pure Rust (MIT/Apache-2.0) + provides the full IANA
+# timezone database (Asia/Kolkata, America/New_York, etc.) with
+# correct DST handling.
+chrono-tz = "0.10"
+
 # Tauri runtime (optional — enables the desktop shell + IPC commands)
 tauri = { version = "2.12", features = [], optional = true }
 tauri-plugin-dialog = { version = "2.8", optional = true }
