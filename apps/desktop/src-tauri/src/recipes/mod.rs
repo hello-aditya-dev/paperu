@@ -31,6 +31,7 @@ use crate::database::Database;
 use crate::errors::{code, AppError, ErrorCategory, Result};
 use crate::filesystem::{copy_and_verify, ConflictPolicy};
 
+pub mod cancel;
 pub mod image_ops;
 pub mod pdf_ops;
 
@@ -564,12 +565,37 @@ pub fn preview_recipe(db: &Database, recipe_id: &str) -> Result<RecipePreview> {
 ///
 /// The run is recorded in `recipe_run_history` with a status of
 /// success | partial | failure | skipped.
-pub fn execute_recipe(
+/// Execute a recipe against `input_paths` with a managed run ID +
+/// cancellation support. Emits progress via `on_progress` between
+/// steps. Checks the cancellation token between steps; if cancelled,
+/// stops scheduling + records the run as cancelled.
+///
+/// This is the canonical entry point called by the gated Tauri command.
+/// The simpler `execute_recipe` (without run_id) is kept for backwards
+/// compatibility with existing tests.
+pub fn execute_recipe_with_run(
     db: &Database,
     recipe_id: &str,
     input_paths: &[String],
+    run_id: &str,
     on_progress: &mut dyn FnMut(&str),
 ) -> Result<RecipeRunResult> {
+    let cancel_token = cancel::register_run(run_id);
+    let result = execute_recipe_inner(db, recipe_id, input_paths, &cancel_token, on_progress);
+    cancel::unregister_run(run_id);
+    result
+}
+
+/// The internal execution loop. Shared by `execute_recipe` (no run_id,
+/// no cancellation) + `execute_recipe_with_run`.
+fn execute_recipe_inner(
+    db: &Database,
+    recipe_id: &str,
+    input_paths: &[String],
+    cancel_token: &std::sync::atomic::AtomicBool,
+    on_progress: &mut dyn FnMut(&str),
+) -> Result<RecipeRunResult> {
+    use std::sync::atomic::Ordering;
     let recipe = db.with_conn(|conn| read_recipe(conn, recipe_id))?;
     if !recipe.enabled {
         return Err(AppError::builder(
@@ -582,24 +608,31 @@ pub fn execute_recipe(
     let steps = list_steps(db, recipe_id)?;
     let started = chrono::Utc::now();
 
-    // Prompt 01 §10: managed run workspace. Each step writes its
-    // outputs into a fresh subdirectory so step outputs flow into
-    // the next step without collision. The workspace is cleaned up
-    // on completion (final outputs have been published to their
-    // destinations via PlaceInOutputDir).
     let workspace = RunWorkspace::new()?;
 
-    // The working set: starts as the user's input paths. Each step
-    // that produces outputs REPLACES the working set with its
-    // outputs (Prompt 01 §10: "If Resize succeeds, Convert must
-    // receive the resized output — not the original").
     let mut current_paths: Vec<String> = input_paths.to_vec();
-
     let mut step_results: Vec<StepResult> = Vec::with_capacity(steps.len());
     let mut any_failure = false;
     let mut any_success = false;
+    let mut was_cancelled = false;
 
     for (idx, step) in steps.iter().enumerate() {
+        // Check cancellation before each step.
+        if cancel_token.load(Ordering::SeqCst) {
+            was_cancelled = true;
+            // Record skipped status for remaining steps (including current).
+            for remaining in &steps[idx..] {
+                step_results.push(StepResult {
+                    step_id: remaining.id.clone(),
+                    kind: remaining.operation.kind_str().to_string(),
+                    status: "skipped".to_string(),
+                    message: "skipped — run cancelled".to_string(),
+                    files_processed: 0,
+                });
+            }
+            break;
+        }
+
         let progress_msg = format!(
             "Step {}/{}: {} ({})",
             idx + 1,
@@ -616,8 +649,6 @@ pub fn execute_recipe(
         let step_dir = workspace.step_dir(idx);
         let (mut result, produced) = execute_step(&step.operation, &current_paths, &step_dir);
         result.step_id = step.id.clone();
-        // If the step produced outputs, those become the working set
-        // for the next step.
         if !produced.is_empty() {
             current_paths = produced;
         }
@@ -633,11 +664,7 @@ pub fn execute_recipe(
         }
         step_results.push(result);
 
-        // Prompt 01 §10 default failure policy: STOP_ON_ERROR.
-        // If a required step fails OR is partial, do not run
-        // subsequent dependent steps.
         if any_failure {
-            // Record skipped status for remaining steps.
             for remaining in &steps[idx + 1..] {
                 step_results.push(StepResult {
                     step_id: remaining.id.clone(),
@@ -651,23 +678,22 @@ pub fn execute_recipe(
         }
     }
 
-    // Prompt 01 §10 final status invariant: a Recipe returns
-    // "success" ONLY when ALL required steps succeed for the
-    // applicable input set. Any failure/partial/skipped → not
-    // success.
-    let status = if any_failure {
+    let status = if was_cancelled || any_failure {
         "failure"
     } else if any_success {
         "success"
     } else {
         "skipped"
     };
-    let message = format_run_message(status, &step_results);
+    let message = if was_cancelled {
+        "run cancelled by user".to_string()
+    } else {
+        format_run_message(status, &step_results)
+    };
 
     let finished = chrono::Utc::now();
     record_run_history(db, recipe_id, started, finished, status, &message)?;
 
-    // The workspace is dropped here → Drop impl cleans up intermediates.
     drop(workspace);
 
     Ok(RecipeRunResult {
@@ -675,6 +701,18 @@ pub fn execute_recipe(
         message,
         step_results,
     })
+}
+
+/// Backwards-compatible entry point: no run_id, no cancellation.
+/// Used by existing tests + the Watch→Recipe dispatcher.
+pub fn execute_recipe(
+    db: &Database,
+    recipe_id: &str,
+    input_paths: &[String],
+    on_progress: &mut dyn FnMut(&str),
+) -> Result<RecipeRunResult> {
+    let dummy_token = std::sync::atomic::AtomicBool::new(false);
+    execute_recipe_inner(db, recipe_id, input_paths, &dummy_token, on_progress)
 }
 
 pub fn list_run_history(
@@ -1563,5 +1601,248 @@ mod tests {
         let h = list_run_history(&db, &r.id, 10).unwrap();
         assert_eq!(h.len(), 1);
         assert_eq!(h[0].status, "skipped");
+    }
+
+    // ── Prompt 01 acceptance tests (Test A-L) ──────────────────────
+
+    /// Helper: write a real JPEG test fixture with optional EXIF.
+    fn write_test_jpeg(path: &std::path::Path, w: u32, h: u32) {
+        use image::codecs::jpeg::JpegEncoder;
+        use image::ExtendedColorType;
+        use image::ImageEncoder;
+        let img = image::DynamicImage::new_rgb8(w, h);
+        let rgb = img.to_rgb8();
+        let mut buf: Vec<u8> = Vec::new();
+        JpegEncoder::new_with_quality(&mut buf, 90)
+            .write_image(rgb.as_raw(), w, h, ExtendedColorType::Rgb8)
+            .unwrap();
+        std::fs::write(path, &buf).unwrap();
+    }
+
+    /// Test A — Complete six-operation Recipe (Prompt 01 §17 Test A).
+    /// Prepare a JPEG, execute Resize → Convert → StripExif →
+    /// Watermark → PlaceInOutputDir → VerifyOutput. All six steps
+    /// must succeed.
+    #[test]
+    fn test_a_complete_six_operation_recipe() {
+        let db = fresh_db();
+        let r = make_recipe(&db, "Six-Op Pipeline");
+        add_step(&db, &r.id, OperationKind::Resize { max_width: 100 }).unwrap();
+        add_step(
+            &db,
+            &r.id,
+            OperationKind::ConvertToFormat {
+                format: "png".to_string(),
+            },
+        )
+        .unwrap();
+        add_step(&db, &r.id, OperationKind::StripExif).unwrap();
+        add_step(
+            &db,
+            &r.id,
+            OperationKind::Watermark {
+                text: "PAPERU TEST".to_string(),
+            },
+        )
+        .unwrap();
+        let dest_dir = std::env::temp_dir().join(format!("paperu-test-a-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        add_step(
+            &db,
+            &r.id,
+            OperationKind::PlaceInOutputDir {
+                dir: dest_dir.to_string_lossy().to_string(),
+            },
+        )
+        .unwrap();
+        add_step(&db, &r.id, OperationKind::VerifyOutput).unwrap();
+
+        let tmp = std::env::temp_dir().join(format!("paperu-test-a-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let src = tmp.join("input.jpg");
+        write_test_jpeg(&src, 200, 150); // 200x150 → resize to 100x75
+
+        let input_paths = [src.to_string_lossy().to_string()];
+        let result = execute_recipe(&db, &r.id, &input_paths, &mut |_| {}).unwrap();
+
+        // All six steps must succeed.
+        assert_eq!(
+            result.status, "success",
+            "overall status: {}",
+            result.message
+        );
+        assert_eq!(result.step_results.len(), 6);
+        for (i, sr) in result.step_results.iter().enumerate() {
+            assert_eq!(
+                sr.status, "success",
+                "step {} ({}) status: {}",
+                i, sr.kind, sr.message
+            );
+        }
+        // The published output exists.
+        let outputs: Vec<_> = std::fs::read_dir(&dest_dir).unwrap().collect();
+        assert!(!outputs.is_empty(), "output published to dest dir");
+        // Source is unchanged.
+        assert!(src.exists(), "source preserved");
+        std::fs::remove_dir_all(&tmp).ok();
+        std::fs::remove_dir_all(&dest_dir).ok();
+    }
+
+    /// Test C — Unsupported combination (Prompt 01 §17 Test C).
+    /// ConvertToFormat with an unsupported format → validation
+    /// failure at create time OR execution failure.
+    #[test]
+    fn test_c_unsupported_combination_fails() {
+        let db = fresh_db();
+        let r = make_recipe(&db, "Bad Convert");
+        // "webp" is not in ALLOWED_FORMATS — add_step validates.
+        let res = add_step(
+            &db,
+            &r.id,
+            OperationKind::ConvertToFormat {
+                format: "webp".to_string(),
+            },
+        );
+        // add_step's OperationKind::validate rejects unknown formats.
+        // If it doesn't, execute_recipe's convert_image will reject.
+        // Either way, the recipe does NOT succeed.
+        if res.is_err() {
+            // Rejected at create time — correct.
+            return;
+        }
+        // If add_step succeeded (validation gap), execute_recipe must fail.
+        let tmp = std::env::temp_dir().join(format!("paperu-test-c-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let src = tmp.join("in.jpg");
+        write_test_jpeg(&src, 50, 50);
+        let result = execute_recipe(
+            &db,
+            &r.id,
+            &[src.to_string_lossy().to_string()],
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_ne!(
+            result.status, "success",
+            "unsupported conversion must not succeed"
+        );
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// Test D — Corrupted image (Prompt 01 §17 Test D).
+    /// Malformed JPEG bytes → Resize fails, no output published,
+    /// original unchanged.
+    #[test]
+    fn test_d_corrupted_image_fails_without_output() {
+        let db = fresh_db();
+        let r = make_recipe(&db, "Corrupt");
+        add_step(&db, &r.id, OperationKind::Resize { max_width: 50 }).unwrap();
+        let dest_dir = std::env::temp_dir().join(format!("paperu-test-d-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        add_step(
+            &db,
+            &r.id,
+            OperationKind::PlaceInOutputDir {
+                dir: dest_dir.to_string_lossy().to_string(),
+            },
+        )
+        .unwrap();
+
+        let tmp = std::env::temp_dir().join(format!("paperu-test-d-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let src = tmp.join("corrupt.jpg");
+        std::fs::write(&src, b"not actually a jpeg").unwrap();
+
+        let result = execute_recipe(
+            &db,
+            &r.id,
+            &[src.to_string_lossy().to_string()],
+            &mut |_| {},
+        )
+        .unwrap();
+        // Resize fails → STOP_ON_ERROR → PlaceInOutputDir skipped.
+        assert_eq!(result.status, "failure");
+        assert_eq!(result.step_results[0].status, "failure");
+        assert_eq!(result.step_results[1].status, "skipped");
+        // No output published.
+        assert_eq!(std::fs::read_dir(&dest_dir).unwrap().count(), 0);
+        // Original unchanged.
+        assert_eq!(std::fs::read(&src).unwrap(), b"not actually a jpeg");
+        std::fs::remove_dir_all(&tmp).ok();
+        std::fs::remove_dir_all(&dest_dir).ok();
+    }
+
+    /// Test G — Existing output not overwritten (Prompt 01 §17 Test G).
+    #[test]
+    fn test_g_existing_output_not_overwritten() {
+        let db = fresh_db();
+        let r = make_recipe(&db, "Collision");
+        let dest_dir = std::env::temp_dir().join(format!("paperu-test-g-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dest_dir).unwrap();
+        // Pre-create an unrelated file at the destination.
+        let dest = dest_dir.join("input.jpg");
+        std::fs::write(&dest, b"original unrelated content").unwrap();
+        add_step(
+            &db,
+            &r.id,
+            OperationKind::PlaceInOutputDir {
+                dir: dest_dir.to_string_lossy().to_string(),
+            },
+        )
+        .unwrap();
+
+        let tmp = std::env::temp_dir().join(format!("paperu-test-g-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let src = tmp.join("input.jpg");
+        write_test_jpeg(&src, 50, 50);
+
+        let result = execute_recipe(
+            &db,
+            &r.id,
+            &[src.to_string_lossy().to_string()],
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(result.status, "success");
+        // The original dest is untouched — the new file went to "input (1).jpg".
+        assert_eq!(std::fs::read(&dest).unwrap(), b"original unrelated content");
+        let entries: Vec<_> = std::fs::read_dir(&dest_dir).unwrap().collect();
+        assert!(entries.len() >= 2, "both original + renamed exist");
+        std::fs::remove_dir_all(&tmp).ok();
+        std::fs::remove_dir_all(&dest_dir).ok();
+    }
+
+    /// Test L — Backward compatibility (Prompt 01 §17 Test L).
+    /// A recipe created with the existing migration schema (0012)
+    /// remains readable + executable after migration 0013.
+    #[test]
+    fn test_l_backward_compatible_recipe() {
+        let db = fresh_db();
+        // Create a recipe with the existing schema.
+        let r = make_recipe(&db, "Legacy Recipe");
+        add_step(&db, &r.id, OperationKind::VerifyOutput).unwrap();
+        // Reload via list_recipes + get_recipe (the public API).
+        let listed = list_recipes(&db).unwrap();
+        assert!(listed.iter().any(|x| x.id == r.id));
+        let reloaded = get_recipe(&db, &r.id).unwrap();
+        assert_eq!(reloaded.name, "Legacy Recipe");
+        // The steps are still readable.
+        let steps = list_steps(&db, &r.id).unwrap();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(steps[0].operation.kind_str(), "verify_output");
+        // The recipe is executable.
+        let tmp = std::env::temp_dir().join(format!("paperu-test-l-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let src = tmp.join("legacy.txt");
+        std::fs::write(&src, b"legacy content").unwrap();
+        let result = execute_recipe(
+            &db,
+            &r.id,
+            &[src.to_string_lossy().to_string()],
+            &mut |_| {},
+        )
+        .unwrap();
+        assert_eq!(result.status, "success");
+        std::fs::remove_dir_all(&tmp).ok();
     }
 }

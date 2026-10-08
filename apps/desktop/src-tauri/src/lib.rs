@@ -335,6 +335,7 @@ mod runtime {
                 crate::commands::recipes::reorder_recipe_steps,
                 crate::commands::recipes::preview_recipe,
                 crate::commands::recipes::execute_recipe,
+                crate::commands::recipes::cancel_recipe_run,
                 crate::commands::recipes::list_recipe_run_history,
                 crate::commands::timer_jobs::create_timer_job,
                 crate::commands::timer_jobs::list_timer_jobs,
