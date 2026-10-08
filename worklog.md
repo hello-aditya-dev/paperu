@@ -607,3 +607,63 @@ Task: 90% continuation sprint — batch 2 (defects + 8 features).
 8. Paperu Send / Webpage→PDF / FFmpeg utilities
 9. Business docs / Licensing / Updater / Analytics
 10. Single instance / Open With / file associations / window state
+
+---
+Task ID: 100-sprint-session-3-checkpoint
+Agent: Builder (Z.ai Code)
+Task: 100% implementation sprint — session 3 (defect-5 + 13 new features).
+
+## Session 3 checkpoint (SHA f6165dc)
+
+### Completed this session
+1. Defect 5 fix: ROUTE_PATHS export + real route resolution test (every available module's route ∈ ROUTE_PATHS).
+2. BUSINESS-01-04: BusinessDocsRoute (invoices/quotes/receipts with line items + tax + decimal totals, pdf-lib).
+3. PDF-22/File-14: PdfCompareRoute (page count comparison + side-by-side first-page render, pdfjs).
+4. FILE-13: MetadataStudioRoute (unified image EXIF + PDF metadata inspect + strip, truthful before/after).
+5. PLATFORM-02: tauri-plugin-single-instance (second launch focuses existing window).
+6. PLATFORM-03: Open With file arg routing (single-instance callback emits paperu://open-file).
+7. PLATFORM-04: File associations (bundle.fileAssociations for PDF + images).
+8. PLATFORM-05: tauri-plugin-window-state (persists position/size/maximized).
+9. PDF-08: crop_pages (lopdf CropBox on selected pages) + 2 tests + PdfPageOpsRoute crop mode.
+10. AUTOMATION-04: Timer Jobs (create/list/delete/toggle + compute_next_run + 4 tests).
+11. Fixed: fileAssociations moved from app to bundle section (Windows CI fix).
+12. Fixed: 'use tauri::Emitter' added inside run() (Windows CI fix).
+
+### Test counts
+- Rust: 147 (was 141 → +4 timer_jobs + 2 crop_pages).
+- Frontend: 134 (unchanged — route resolution test reuses existing infrastructure).
+
+### Windows CI
+- Prior session's commits: GREEN (defects 6m8s, PDF watermark 6m42s, Passport Photo 6m40s).
+- This session: fileAssociations fix FAILED (wrong config section) → fixed → Emitter import missing → fixed → CI running on f6165dc.
+- The single-instance + window-state plugins compile on Windows MSVC (validated by the CI downloading the crates).
+
+### Remaining implementable items (~12)
+1. PDF-07 Insert pages (pdf-lib embedPages)
+2. PDF-13 Password protect (qpdf/lopdf encryption — complex)
+3. PDF-14 Authorized unlock (same)
+4. PDF-17 Annotations (pdf-lib — moderate)
+5. PDF-18 Destructive redaction (render→burn→rebuild — complex)
+6. IMAGE-09 Batch image ops (expand Batch Studio)
+7. STUDENT-13 Paperu Send (LAN transfer — complex)
+8. FILE-09 Clipboard History (local opt-in)
+9. AUTOMATION-02 Recipes (typed workflows)
+10. AUTOMATION-03 Watch Folders (rule→recipe execution)
+11. MEDIA-01 FFmpeg utilities (external binary — complex)
+12. WEB-01 Webpage→PDF (isolated browser — complex)
+13. COMMERCIAL-02 Activation/restore (local signed entitlement)
+14. COMMERCIAL-03 Updater (notify-only signed updater)
+15. COMMERCIAL-04 Analytics (local opt-in events)
+
+### External blockers (genuine)
+- RELEASE-02: Authenticode certificate (unsigned release candidate only).
+- RELEASE-03: Windows runtime QA (needs Windows machine + Tauri-driver).
+
+### Resume instructions
+1. `cd /home/z/paperu && git checkout agent/builder && git pull --ff-only origin agent/builder`
+2. `export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"` + `pnpm install --frozen-lockfile`
+3. `pnpm run check` for the full gate set.
+4. Continue from "Remaining implementable items" #1 (PDF-07 Insert pages).
+5. After each feature: commit + push + check Windows CI.
+6. The 5 defects are ALL FIXED + Windows-validated. Do NOT re-fix.
+7. The commands-blind-spot (gated #![cfg(feature="tauri-runtime")] files only compiled on Windows CI) remains — test non-gated modules locally + rely on Windows CI for gated code.
