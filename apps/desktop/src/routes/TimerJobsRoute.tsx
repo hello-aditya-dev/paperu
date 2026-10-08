@@ -35,6 +35,7 @@ const KINDS: ReadonlyArray<{ id: ScheduleKind; label: string; placeholder: strin
 
 const ACTION_TYPES: ReadonlyArray<{ id: string; label: string }> = [
   { id: "backup_recipe", label: "Backup Recipe" },
+  { id: "recipe", label: "Typed Recipe" },
   { id: "organizer_rule", label: "Organizer Rule (skipped — pending)" },
 ];
 

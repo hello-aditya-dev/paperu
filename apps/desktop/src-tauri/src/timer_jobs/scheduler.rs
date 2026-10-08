@@ -141,6 +141,51 @@ impl Scheduler {
                     message: "organizer_rule dispatch not yet implemented".to_string(),
                 }
             }
+            "recipe" => {
+                // P01: dispatch a Typed Recipe. The recipe's own
+                // sources are used as input (the timer fires the
+                // recipe as configured). No arbitrary paths from
+                // the timer — only the recipe's stored steps.
+                let recipe_exists = crate::recipes::list_recipes(&self.db)
+                    .is_ok_and(|list| list.iter().any(|r| r.id == job.action_id));
+                if !recipe_exists {
+                    return DispatchResult {
+                        status: "skipped",
+                        message: "typed recipe no longer exists".to_string(),
+                    };
+                }
+                // Execute with empty input — the recipe's own steps
+                // (PlaceInOutputDir etc.) determine what files are
+                // processed. For recipes that need input files, the
+                // user configures PlaceInOutputDir with explicit paths.
+                let mut progress_calls: Vec<String> = Vec::new();
+                let result = crate::recipes::execute_recipe(
+                    &self.db,
+                    &job.action_id,
+                    &[],
+                    &mut |msg: &str| {
+                        progress_calls.push(msg.to_string());
+                    },
+                );
+                match result {
+                    Ok(r) => DispatchResult {
+                        status: if r.status == "success" {
+                            "success"
+                        } else {
+                            "failure"
+                        },
+                        message: format!(
+                            "recipe {}: {} steps executed",
+                            r.status,
+                            r.step_results.len()
+                        ),
+                    },
+                    Err(e) => DispatchResult {
+                        status: "failure",
+                        message: e.message.clone(),
+                    },
+                }
+            }
             _ => DispatchResult {
                 status: "skipped",
                 message: format!("unsupported action: {}", job.action_type),

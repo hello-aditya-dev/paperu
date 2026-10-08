@@ -38,7 +38,8 @@ use crate::errors::{code, AppError, ErrorCategory, Result};
 
 /// The allowlist of action types the scheduler will dispatch. Anything
 /// else is rejected at create time AND at dispatch time (defence in depth).
-pub const ALLOWED_ACTION_TYPES: &[&str] = &["backup_recipe", "organizer_rule"];
+/// P01: added `recipe` so timers can run Typed Recipes on a schedule.
+pub const ALLOWED_ACTION_TYPES: &[&str] = &["backup_recipe", "organizer_rule", "recipe"];
 
 /// A persisted scheduled job.
 #[derive(Debug, Clone, Deserialize, Serialize)]
