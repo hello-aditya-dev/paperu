@@ -16,6 +16,8 @@ pub mod application_kit;
 #[cfg(feature = "tauri-runtime")]
 pub mod archive_studio;
 #[cfg(feature = "tauri-runtime")]
+pub mod backup_recipes;
+#[cfg(feature = "tauri-runtime")]
 pub mod citations;
 #[cfg(feature = "tauri-runtime")]
 pub mod downloads_cleaner;
@@ -58,6 +60,8 @@ pub mod watch;
 pub use application_kit::*;
 #[cfg(feature = "tauri-runtime")]
 pub use archive_studio::*;
+#[cfg(feature = "tauri-runtime")]
+pub use backup_recipes::*;
 #[cfg(feature = "tauri-runtime")]
 pub use citations::*;
 #[cfg(feature = "tauri-runtime")]

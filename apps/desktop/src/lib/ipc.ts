@@ -41,6 +41,9 @@ import type {
   StudyPackItem,
   CreatePackRequest,
   AddItemRequest,
+  BackupRecipe,
+  BackupRunResult,
+  CreateRecipeRequest,
   CopyVerifyResult,
   CopyVerifyRequest,
   FormField,
@@ -67,6 +70,7 @@ import {
   RescueCommand,
   SignatureVaultCommand,
   StudyPacksCommand,
+  BackupRecipesCommand,
   UsbToolboxCommand,
   WatchCommand,
   isAppError,
@@ -672,6 +676,21 @@ export async function listStudyPackItems(packId: string): Promise<StudyPackItem[
 }
 export async function removeStudyPackItem(id: string): Promise<void> {
   await call<null>(StudyPacksCommand.RemoveItem, { id });
+}
+
+
+// ── Backup Recipes (90% §54) ───────────────────────────────────────
+export async function createBackupRecipe(request: CreateRecipeRequest): Promise<BackupRecipe> {
+  return call<BackupRecipe>(BackupRecipesCommand.Create, { request });
+}
+export async function listBackupRecipes(): Promise<BackupRecipe[]> {
+  return call<BackupRecipe[]>(BackupRecipesCommand.List);
+}
+export async function deleteBackupRecipe(id: string): Promise<void> {
+  await call<null>(BackupRecipesCommand.Delete, { id });
+}
+export async function runBackupRecipe(id: string): Promise<BackupRunResult> {
+  return call<BackupRunResult>(BackupRecipesCommand.Run, { id });
 }
 
 // ── Notes ────────────────────────────────────────────────────────

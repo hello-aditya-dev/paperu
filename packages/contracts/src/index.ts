@@ -33,3 +33,4 @@ export * from "./signature_vault.js";
 export * from "./usb_toolbox.js";
 export * from "./forms_vault.js";
 export * from "./study_packs.js";
+export * from "./backup_recipes.js";

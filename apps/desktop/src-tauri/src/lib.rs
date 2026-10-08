@@ -49,6 +49,7 @@
 pub mod application_kit;
 #[allow(clippy::all)]
 pub mod archive_studio;
+pub mod backup_recipes;
 #[allow(clippy::all)]
 pub mod citations;
 pub mod commands;
@@ -223,6 +224,10 @@ mod runtime {
                 crate::commands::study_packs::add_study_pack_item,
                 crate::commands::study_packs::list_study_pack_items,
                 crate::commands::study_packs::remove_study_pack_item,
+                crate::commands::backup_recipes::create_backup_recipe,
+                crate::commands::backup_recipes::list_backup_recipes,
+                crate::commands::backup_recipes::delete_backup_recipe,
+                crate::commands::backup_recipes::run_backup_recipe,
                 crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())
