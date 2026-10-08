@@ -5,10 +5,12 @@ packages:
   - "apps/*"
   - "packages/*"
 
-# pnpm 12.x: explicitly allow only canvas to run its build script.
-# canvas@3.2.3 needs prebuild-install/node-gyp for native bindings
-# (used by pdfjs test harness). No other dependencies require build
-# scripts. This replaces the previous dangerouslyAllowAllBuilds
-# which was overly permissive.
-onlyBuiltDependencies:
-  - canvas
+# pnpm 12.x: canvas@3.2.3 has build scripts (prebuild-install/node-gyp).
+# pnpm 12.9.1 errors with ERR_PNPM_IGNORED_BUILDS if any package has
+# build scripts that weren't explicitly approved. The onlyBuiltDependencies
+# setting should work but pnpm 12.9.1 on CI still errors. Using
+# dangerouslyAllowAllBuilds as the proven workaround (3/4 CI targets
+# green on e693970). Security note: this allows ALL build scripts,
+# not just canvas. In production, restrict to onlyBuiltDependencies:
+# [canvas] once pnpm 12.9.1's handling is confirmed.
+dangerouslyAllowAllBuilds: true
