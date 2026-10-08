@@ -193,11 +193,16 @@ mod runtime {
                     match crate::commands::open_with::validate_open_with_path(&raw_arg) {
                         Ok(validated) => {
                             let payload = validated.to_string_lossy().into_owned();
-                            // Clone the Arc handle out of the Tauri-managed
-                            // State guard (breaks the lifetime chain from
-                            // `app`) + lock independently.
-                            let q = app.state::<AppState>().open_with_queue.clone();
-                            if let Ok(mut guard) = q.lock() {
+                            // Clone the AppHandle (cheap, breaks the
+                            // lifetime chain from `&mut App`) → get the
+                            // Tauri-managed AppState → clone the Arc
+                            // queue handle → lock independently. Each
+                            // step produces an owned value so there's
+                            // no borrowed-temporary lifetime issue.
+                            let handle = app.handle().clone();
+                            let state = handle.state::<AppState>();
+                            let queue = state.open_with_queue.clone();
+                            if let Ok(mut guard) = queue.lock() {
                                 guard.push(payload);
                             }
                         }
