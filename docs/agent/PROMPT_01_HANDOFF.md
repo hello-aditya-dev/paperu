@@ -1,10 +1,10 @@
 # PAPERU 98% PROGRAM — STEP 1 HANDOFF
 
 **Starting SHA:** `6bb6dec46a009c78517eab675a223c7acc8d277b`
-**Final SHA:** `30a01d6267be64ea157e3674ca9744175d913da9`
+**Final SHA:** `41468568937157f0b87ae01366ebb5f46636ffcd`
 **Branch:** `agent/builder`
-**Commits:** 5 (P01-1 native engine, P01-2 UI subagent, P01 progress+cancel+migration, 2 Windows clippy fixes)
-**Files changed:** 12 new + 8 modified
+**Commits:** 9 (P01-1 native engine, P01-2 UI subagent, P01 progress+cancel+migration, 2 Windows clippy fixes, cross-platform foundation, feature acceptance matrix, CI workflow fix)
+**Files changed:** 20 new + 12 modified
 
 ## Operations completed
 
@@ -71,12 +71,42 @@ Updated in `docs/qa/90_PERCENT_ACCEPTANCE.md`:
 
 ## NEXT TASK
 
-**PROMPT 02 — WATCH FOLDERS AND TIMER AUTOMATION**
+**PROMPT 02 — WATCH FOLDERS, TIMER JOBS, ORGANIZER AND AUTOMATION**
 
-The Recipe engine now processes files natively. The next step wires the existing Watch Folders (notify) + Timer Jobs (scheduler) to dispatch Recipes automatically:
+The Recipe engine now processes files natively. The cross-platform
+foundation is in place. The next step wires the existing Watch
+Folders (notify) + Timer Jobs (scheduler) to dispatch Recipes
+automatically:
 
-- Watch Folders: when a file appears, find matching watch rules + execute the recipe with the new file as input (P5f already wired; verify end-to-end with a real image).
-- Timer Jobs: the scheduler already dispatches backup_recipe + organizer_rule actions; add `recipe` as a supported action type so a timer can run a Recipe on a schedule.
-- Both should use the new `execute_recipe_with_run` (with cancellation + progress events).
+- Watch Folders: when a file appears, find matching watch rules +
+  execute the recipe with the new file as input (P5f already wired;
+  verify end-to-end with a real image on all 4 platforms).
+- Timer Jobs: the scheduler already dispatches backup_recipe +
+  organizer_rule actions; add `recipe` as a supported action type
+  so a timer can run a Recipe on a schedule.
+- Both should use the new `execute_recipe_with_run` (with
+  cancellation + progress events).
 
-The infrastructure (watch_rules, timer_jobs scheduler, recipes executor) all exists — the next step is integration testing + the `recipe` action type in the timer scheduler.
+The infrastructure (watch_rules, timer_jobs scheduler, recipes
+executor, platform module) all exists — the next step is
+integration testing on all 4 platforms + the `recipe` action type
+in the timer scheduler.
+
+## Cross-platform foundation (Phase 1-4)
+
+- **tauri.conf.json:** `"targets": "all"` (was Windows-only nsis,msi).
+  CI selects per-platform bundles via `--bundles` flag. Added
+  `icon.icns` to the icon set (macOS).
+- **cross-platform.yml:** new 4-target native CI matrix
+  (windows-2022, macos-15 ARM, macos-13 Intel, ubuntu-22.04). Each
+  target: checkout → Node 20 → pnpm 12.9.1 → Rust 1.99.0 → Linux
+  native deps → fmt → clippy (tauri-runtime) → test (tauri-runtime) →
+  tauri build --bundles <platform> → assert artifacts → SHA-256 →
+  upload. `fail-fast: false`.
+- **rust-toolchain.toml:** pinned 1.99.0 + 4 cross-platform targets.
+- **platform module:** `src/platform/{mod,windows,macos,linux}.rs` —
+  PlatformCapabilities trait with `#[cfg(target_os)]` selection.
+- **docs/development/ENVIRONMENT.md** + **PLATFORM_MATRIX.md** —
+  exact setup for Linux/macOS/Windows + platform-specific behavior.
+- **docs/product/COMPLETE_FEATURE_MATRIX.md** + **feature-acceptance.json**
+  — full per-feature acceptance matrix with per-platform status.
