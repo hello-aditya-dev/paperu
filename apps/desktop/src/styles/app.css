@@ -795,6 +795,17 @@
   font-size: var(--paperu-text-xs);
   color: var(--paperu-destructive);
 }
+/* Invalid-field highlight for Business Docs (and reuse elsewhere).
+ * Outlines the input red rather than silently coercing bad input to
+ * 0 — the user sees what's wrong before Generate is enabled. */
+.paperu-bizdocs__invalid {
+  border-color: var(--paperu-destructive);
+  background: color-mix(in srgb, var(--paperu-destructive) 6%, transparent);
+}
+.paperu-bizdocs__invalid:focus-visible {
+  outline: 2px solid var(--paperu-destructive);
+  outline-offset: 1px;
+}
 .paperu-target__hint {
   margin-top: var(--paperu-space-2);
   font-size: var(--paperu-text-xs);
