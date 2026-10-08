@@ -72,6 +72,24 @@ notify = { version = "8", default-features = false, features = ["macos_fsevent"]
 # Shared copy+verify primitive (90% §52) — SHA-256 source/dest compare.
 sha2 = "0.11"
 
+# Native image processing (Prompt 01 §5.1) — MIT/Apache-2.0, commercially
+# redistributable. Used by the Recipe engine for Resize / Convert /
+# StripExif / image Watermark. JPEG + PNG enabled (WebP needs a C
+# dependency on some builds; keep off for portability).
+image = { version = "0.25", default-features = false, features = [
+  "jpeg",
+  "png",
+  "gif",
+  "bmp",
+  "ico",
+] }
+
+# Font rasterization for native text watermarking (Prompt 01 §9).
+# ab_glyph is pure Rust (MIT/Apache-2.0) + renders TTF outlines into
+# alpha bitmaps we composite onto image buffers + PDF content streams.
+# We bundle DejaVu Sans Bold (Bitstream license) — see assets/fonts/.
+ab_glyph = "0.2"
+
 # Tauri runtime (optional — enables the desktop shell + IPC commands)
 tauri = { version = "2.12", features = [], optional = true }
 tauri-plugin-dialog = { version = "2.8", optional = true }

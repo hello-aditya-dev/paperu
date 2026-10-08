@@ -1,0 +1,29 @@
+DejaVu Sans Bold
+================
+
+Source: https://dejavu-fonts.github.io/
+License: Bitstream Vera + DejaVu Font License (permissive, commercially redistributable)
+
+Copyright (c) 2003 by Bitstream, Inc. All Rights Reserved.
+DejaVu changes are in public domain.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the fonts and associated documentation files (the "Fonts"),
+to deal in the Fonts without restriction, including without limitation
+the rights to use, copy, merge, publish, distribute, sublicense, and/or
+sell copies of the Fonts, and to permit persons to whom the Fonts are
+furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies of the Fonts.
+
+THE FONTS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+FONTS OR THE USE OR OTHER DEALINGS IN THE FONTS.
+
+This font is bundled with Paperu for native text-watermark rendering
+(no machine-specific installed font dependency). It is not modified.

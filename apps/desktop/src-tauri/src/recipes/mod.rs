@@ -20,7 +20,7 @@
 //! The frontend (`RecipesRoute.tsx`) renders the preview + history so
 //! the user can see exactly what each recipe will do before running it.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
@@ -30,6 +30,9 @@ use uuid::Uuid;
 use crate::database::Database;
 use crate::errors::{code, AppError, ErrorCategory, Result};
 use crate::filesystem::{copy_and_verify, ConflictPolicy};
+
+pub mod image_ops;
+pub mod pdf_ops;
 
 /// Allowed conversion formats for `ConvertToFormat`.
 pub const ALLOWED_FORMATS: &[&str] = &["pdf", "jpeg", "png"];
@@ -206,10 +209,21 @@ impl OperationKind {
         Ok(())
     }
 
-    /// True if this operation is fully executed Rust-side in V1.
-    /// False for image/PDF operations that need the frontend engine.
+    /// True if this operation is fully executed Rust-side. All six
+    /// operations are now natively executed (Prompt 01 §5-9):
+    /// Resize, ConvertToFormat, StripExif, Watermark use the native
+    /// image/pdf ops; PlaceInOutputDir + VerifyOutput use the shared
+    /// filesystem primitives.
     pub fn is_rust_executable(&self) -> bool {
-        matches!(self, Self::PlaceInOutputDir { .. } | Self::VerifyOutput)
+        matches!(
+            self,
+            Self::Resize { .. }
+                | Self::ConvertToFormat { .. }
+                | Self::StripExif
+                | Self::Watermark { .. }
+                | Self::PlaceInOutputDir { .. }
+                | Self::VerifyOutput
+        )
     }
 }
 
@@ -568,15 +582,20 @@ pub fn execute_recipe(
     let steps = list_steps(db, recipe_id)?;
     let started = chrono::Utc::now();
 
-    // Snapshot the input paths so each step can read the previous
-    // step's outputs. For V1, frontend-only steps don't produce
-    // outputs in Rust, so the input set stays the same across steps.
-    // (When frontend steps are wired up, this vec will be replaced
-    // with the frontend's transformed outputs.)
+    // Prompt 01 §10: managed run workspace. Each step writes its
+    // outputs into a fresh subdirectory so step outputs flow into
+    // the next step without collision. The workspace is cleaned up
+    // on completion (final outputs have been published to their
+    // destinations via PlaceInOutputDir).
+    let workspace = RunWorkspace::new()?;
+
+    // The working set: starts as the user's input paths. Each step
+    // that produces outputs REPLACES the working set with its
+    // outputs (Prompt 01 §10: "If Resize succeeds, Convert must
+    // receive the resized output — not the original").
     let mut current_paths: Vec<String> = input_paths.to_vec();
 
     let mut step_results: Vec<StepResult> = Vec::with_capacity(steps.len());
-    let mut any_partial = false;
     let mut any_failure = false;
     let mut any_success = false;
 
@@ -587,38 +606,57 @@ pub fn execute_recipe(
             steps.len(),
             step.operation.kind_str(),
             if step.operation.is_rust_executable() {
-                "rust"
+                "native"
             } else {
                 "needs frontend"
             }
         );
         on_progress(&progress_msg);
 
-        let (mut result, produced) = execute_step(&step.operation, &current_paths);
+        let step_dir = workspace.step_dir(idx);
+        let (mut result, produced) = execute_step(&step.operation, &current_paths, &step_dir);
         result.step_id = step.id.clone();
         // If the step produced outputs, those become the working set
-        // for the next step. For V1, only `PlaceInOutputDir`
-        // produces outputs (the destination copies), and a later
-        // `VerifyOutput` step then verifies the COPIES, not the
-        // originals. Frontend-only steps don't produce outputs in
-        // Rust, so the working set stays as-is for those steps.
+        // for the next step.
         if !produced.is_empty() {
             current_paths = produced;
         }
 
-        match result.status.as_str() {
-            "success" => any_success = true,
-            "partial" => any_partial = true,
-            "failure" => any_failure = true,
-            _ => {}
+        let is_failure = result.status == "failure";
+        let is_success = result.status == "success";
+        let is_partial = result.status == "partial";
+        if is_success {
+            any_success = true;
+        }
+        if is_failure || is_partial {
+            any_failure = true;
         }
         step_results.push(result);
+
+        // Prompt 01 §10 default failure policy: STOP_ON_ERROR.
+        // If a required step fails OR is partial, do not run
+        // subsequent dependent steps.
+        if any_failure {
+            // Record skipped status for remaining steps.
+            for remaining in &steps[idx + 1..] {
+                step_results.push(StepResult {
+                    step_id: remaining.id.clone(),
+                    kind: remaining.operation.kind_str().to_string(),
+                    status: "skipped".to_string(),
+                    message: "skipped — previous step failed (STOP_ON_ERROR)".to_string(),
+                    files_processed: 0,
+                });
+            }
+            break;
+        }
     }
 
+    // Prompt 01 §10 final status invariant: a Recipe returns
+    // "success" ONLY when ALL required steps succeed for the
+    // applicable input set. Any failure/partial/skipped → not
+    // success.
     let status = if any_failure {
         "failure"
-    } else if any_partial {
-        "partial"
     } else if any_success {
         "success"
     } else {
@@ -628,6 +666,9 @@ pub fn execute_recipe(
 
     let finished = chrono::Utc::now();
     record_run_history(db, recipe_id, started, finished, status, &message)?;
+
+    // The workspace is dropped here → Drop impl cleans up intermediates.
+    drop(workspace);
 
     Ok(RecipeRunResult {
         status: status.to_string(),
@@ -658,30 +699,137 @@ pub fn list_run_history(
 
 // ── Step execution ────────────────────────────────────────────────
 
+/// A managed workspace for a single recipe run. Each step writes its
+/// outputs into a fresh subdirectory so step outputs flow into the
+/// next step without collision. The workspace is cleaned up on
+/// completion or cancellation.
+struct RunWorkspace {
+    root: PathBuf,
+}
+
+impl RunWorkspace {
+    fn new() -> Result<Self> {
+        let ws = crate::filesystem::temp::TempWorkspace::ensure()?;
+        let id = uuid::Uuid::new_v4();
+        let root = ws.root().join(format!("run-{id}"));
+        std::fs::create_dir_all(&root).map_err(|e| {
+            crate::errors::AppError::builder(
+                crate::errors::code::IO_FAILURE,
+                crate::errors::ErrorCategory::Filesystem,
+                "Paperu couldn't create the run workspace.",
+            )
+            .technical(e.to_string())
+            .build()
+        })?;
+        Ok(Self { root })
+    }
+
+    /// A fresh subdirectory for a step's outputs.
+    fn step_dir(&self, step_index: usize) -> PathBuf {
+        let dir = self.root.join(format!("step-{step_index}"));
+        let _ = std::fs::create_dir_all(&dir);
+        dir
+    }
+}
+
+/// On drop, clean up the workspace directory. Best-effort — if the
+/// cleanup fails (e.g. a file is locked), the TempWorkspace startup
+/// sweep will remove it on the next launch.
+impl Drop for RunWorkspace {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.root);
+    }
+}
+
 /// Execute one step against `input_paths`. Returns the step result
-/// AND an optional vec of produced output paths (which become the
-/// working set for the next step). For V1, only `PlaceInOutputDir`
-/// produces outputs (the destination copies); frontend-only steps
-/// produce no outputs in Rust.
-fn execute_step(op: &OperationKind, input_paths: &[String]) -> (StepResult, Vec<String>) {
+/// AND a vec of produced output paths (which become the working set
+/// for the next step). All six operations are now natively executed
+/// (Prompt 01 §5-9): image ops delegate to `recipes::image_ops`,
+/// PDF watermark delegates to `recipes::pdf_ops`, PlaceInOutputDir +
+/// VerifyOutput use the shared filesystem primitives.
+fn execute_step(
+    op: &OperationKind,
+    input_paths: &[String],
+    step_dir: &Path,
+) -> (StepResult, Vec<String>) {
     let kind = op.kind_str();
     match op {
-        OperationKind::Resize { .. }
-        | OperationKind::ConvertToFormat { .. }
-        | OperationKind::StripExif
-        | OperationKind::Watermark { .. } => (
-            StepResult {
-                step_id: String::new(),
-                kind: kind.to_string(),
-                status: "partial".to_string(),
-                message: format!(
-                    "{} needs frontend engine — recorded, not executed (V1)",
-                    kind
-                ),
-                files_processed: input_paths.len() as u64,
-            },
-            Vec::new(),
-        ),
+        OperationKind::Resize { max_width } => {
+            execute_image_op(kind, input_paths, step_dir, |input, dir, name| {
+                image_ops::resize_image(input, *max_width, dir, name)
+            })
+        }
+        OperationKind::ConvertToFormat { format } => {
+            execute_image_op(kind, input_paths, step_dir, |input, dir, name| {
+                image_ops::convert_image(input, format, dir, name)
+            })
+        }
+        OperationKind::StripExif => {
+            execute_image_op(kind, input_paths, step_dir, |input, dir, name| {
+                image_ops::strip_exif(input, dir, name)
+            })
+        }
+        OperationKind::Watermark { text } => {
+            // For images, use image_ops::watermark_image. For PDFs,
+            // use pdf_ops::watermark_pdf. Detect by extension.
+            let mut processed: u64 = 0;
+            let mut failures: Vec<String> = Vec::new();
+            let mut produced: Vec<String> = Vec::new();
+            for input in input_paths {
+                let src = Path::new(input);
+                let is_pdf = std::path::Path::new(input)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("pdf"));
+                let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("out");
+                if is_pdf {
+                    match pdf_ops::watermark_pdf(src, text, step_dir, stem) {
+                        Ok(r) => {
+                            processed += 1;
+                            produced.push(r.output_path.to_string_lossy().into_owned());
+                        }
+                        Err(e) => {
+                            failures.push(format!("{} ({e})", input));
+                        }
+                    }
+                } else {
+                    let name = format!("{stem}.png");
+                    match image_ops::watermark_image(src, text, step_dir, &name) {
+                        Ok(r) => {
+                            processed += 1;
+                            produced.push(r.output_path.to_string_lossy().into_owned());
+                        }
+                        Err(e) => {
+                            failures.push(format!("{} ({e})", input));
+                        }
+                    }
+                }
+            }
+            let status = if failures.is_empty() {
+                "success"
+            } else if processed > 0 {
+                "partial"
+            } else {
+                "failure"
+            };
+            let message = if failures.is_empty() {
+                format!("watermarked {processed} file(s)")
+            } else {
+                format!(
+                    "watermarked {processed} file(s); failed: {}",
+                    failures.join("; ")
+                )
+            };
+            (
+                StepResult {
+                    step_id: String::new(),
+                    kind: kind.to_string(),
+                    status: status.to_string(),
+                    message,
+                    files_processed: processed,
+                },
+                produced,
+            )
+        }
         OperationKind::PlaceInOutputDir { dir } => {
             let dest_dir = Path::new(dir);
             let mut processed: u64 = 0;
@@ -784,6 +932,58 @@ fn execute_step(op: &OperationKind, input_paths: &[String]) -> (StepResult, Vec<
             )
         }
     }
+}
+
+/// Helper: run an image operation (resize/convert/strip_exif) on each
+/// input file. Produces outputs in `step_dir` which become the
+/// working set for the next step.
+fn execute_image_op(
+    kind: &'static str,
+    input_paths: &[String],
+    step_dir: &Path,
+    op: impl Fn(&Path, &Path, &str) -> Result<image_ops::ImageOpResult>,
+) -> (StepResult, Vec<String>) {
+    let mut processed: u64 = 0;
+    let mut failures: Vec<String> = Vec::new();
+    let mut produced: Vec<String> = Vec::new();
+    for input in input_paths {
+        let src = Path::new(input);
+        let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("out");
+        match op(src, step_dir, stem) {
+            Ok(r) => {
+                processed += 1;
+                produced.push(r.output_path.to_string_lossy().into_owned());
+            }
+            Err(e) => {
+                failures.push(format!("{} ({e})", input));
+            }
+        }
+    }
+    let status = if failures.is_empty() {
+        "success"
+    } else if processed > 0 {
+        "partial"
+    } else {
+        "failure"
+    };
+    let message = if failures.is_empty() {
+        format!("{kind} {processed} file(s)")
+    } else {
+        format!(
+            "{kind} {processed} file(s); failed: {}",
+            failures.join("; ")
+        )
+    };
+    (
+        StepResult {
+            step_id: String::new(),
+            kind: kind.to_string(),
+            status: status.to_string(),
+            message,
+            files_processed: processed,
+        },
+        produced,
+    )
 }
 
 /// Compute the SHA-256 of a file. Used by `VerifyOutput`.
@@ -1122,7 +1322,10 @@ mod tests {
         assert_eq!(preview.steps.len(), 3);
         assert_eq!(preview.operations.len(), 3);
         assert_eq!(preview.operations[0].kind, "resize");
-        assert!(!preview.operations[0].rust_executable);
+        assert!(
+            preview.operations[0].rust_executable,
+            "resize is now natively executed"
+        );
         assert_eq!(preview.operations[1].kind, "place_in_output_dir");
         assert!(preview.operations[1].rust_executable);
         assert_eq!(preview.operations[2].kind, "verify_output");
@@ -1179,9 +1382,11 @@ mod tests {
 
     #[test]
     fn execute_recipe_with_unsupported_step_records_needs_frontend_and_continues() {
+        // Prompt 01 §10: Resize is now NATIVELY executed. A non-image
+        // input (e.g. .bin) fails the Resize step → STOP_ON_ERROR
+        // skips subsequent steps → overall status = failure.
         let db = fresh_db();
         let r = make_recipe(&db, "Mixed");
-        // Resize (frontend) then PlaceInOutputDir (Rust) then VerifyOutput (Rust).
         add_step(&db, &r.id, OperationKind::Resize { max_width: 1024 }).unwrap();
         add_step(
             &db,
@@ -1199,25 +1404,30 @@ mod tests {
         let tmp =
             std::env::temp_dir().join(format!("paperu-recipe-fe-src-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&tmp).unwrap();
-        let src = tmp.join("input.bin");
+        let src = tmp.join("input.bin"); // NOT an image → Resize fails.
         std::fs::write(&src, b"recipe input bytes").unwrap();
 
         let input_paths = [src.to_string_lossy().to_string()];
         let result = execute_recipe(&db, &r.id, &input_paths, &mut |_| {}).unwrap();
 
-        // Overall status is partial because Resize was partial.
-        assert_eq!(result.status, "partial");
+        // Overall status is failure because Resize failed on a non-image.
+        assert_eq!(result.status, "failure", "non-image input → Resize failure");
         assert_eq!(result.step_results.len(), 3);
-        // Resize recorded needs-frontend.
-        assert_eq!(result.step_results[0].status, "partial");
-        assert!(
-            result.step_results[0].message.contains("frontend"),
-            "Resize step must mention frontend: {}",
+        // Resize failed (couldn't decode a .bin as an image).
+        assert_eq!(
+            result.step_results[0].status, "failure",
+            "Resize on non-image: {}",
             result.step_results[0].message
         );
-        // The Rust steps still executed.
-        assert_eq!(result.step_results[1].status, "success");
-        assert_eq!(result.step_results[2].status, "success");
+        // Subsequent steps were SKIPPED (STOP_ON_ERROR).
+        assert_eq!(
+            result.step_results[1].status, "skipped",
+            "PlaceInOutputDir skipped after Resize failure"
+        );
+        assert_eq!(
+            result.step_results[2].status, "skipped",
+            "VerifyOutput skipped after Resize failure"
+        );
         std::fs::remove_dir_all(&tmp).ok();
     }
 
