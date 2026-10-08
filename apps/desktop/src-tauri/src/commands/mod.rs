@@ -52,6 +52,8 @@ pub mod signature_vault;
 #[cfg(feature = "tauri-runtime")]
 pub mod study_packs;
 #[cfg(feature = "tauri-runtime")]
+pub mod timer_jobs;
+#[cfg(feature = "tauri-runtime")]
 pub mod usb_toolbox;
 #[cfg(feature = "tauri-runtime")]
 pub mod watch;
@@ -96,6 +98,8 @@ pub use shell::*;
 pub use signature_vault::*;
 #[cfg(feature = "tauri-runtime")]
 pub use study_packs::*;
+#[cfg(feature = "tauri-runtime")]
+pub use timer_jobs::*;
 #[cfg(feature = "tauri-runtime")]
 pub use usb_toolbox::*;
 #[cfg(feature = "tauri-runtime")]

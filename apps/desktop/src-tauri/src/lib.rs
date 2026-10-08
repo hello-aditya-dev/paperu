@@ -81,6 +81,7 @@ pub mod settings;
 pub mod signature_vault;
 pub mod study_packs;
 pub mod tasks;
+pub mod timer_jobs;
 pub mod watch;
 
 #[cfg(feature = "tauri-runtime")]
@@ -244,6 +245,10 @@ mod runtime {
                 crate::commands::backup_recipes::list_backup_recipes,
                 crate::commands::backup_recipes::delete_backup_recipe,
                 crate::commands::backup_recipes::run_backup_recipe,
+                crate::commands::timer_jobs::create_timer_job,
+                crate::commands::timer_jobs::list_timer_jobs,
+                crate::commands::timer_jobs::delete_timer_job,
+                crate::commands::timer_jobs::toggle_timer_job,
                 crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())

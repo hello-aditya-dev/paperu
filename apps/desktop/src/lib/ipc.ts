@@ -44,6 +44,8 @@ import type {
   BackupRecipe,
   BackupRunResult,
   CreateRecipeRequest,
+  TimerJob,
+  CreateTimerRequest,
   CopyVerifyResult,
   CopyVerifyRequest,
   FormField,
@@ -71,6 +73,7 @@ import {
   SignatureVaultCommand,
   StudyPacksCommand,
   BackupRecipesCommand,
+  TimerJobsCommand,
   UsbToolboxCommand,
   WatchCommand,
   isAppError,
@@ -705,6 +708,20 @@ export async function runBackupRecipe(id: string): Promise<BackupRunResult> {
   return call<BackupRunResult>(BackupRecipesCommand.Run, { id });
 }
 
+
+// ── Timer Jobs (90% §59, AUTOMATION-04) ───────────────────────────
+export async function createTimerJob(request: CreateTimerRequest): Promise<TimerJob> {
+  return call<TimerJob>(TimerJobsCommand.Create, { request });
+}
+export async function listTimerJobs(): Promise<TimerJob[]> {
+  return call<TimerJob[]>(TimerJobsCommand.List);
+}
+export async function deleteTimerJob(id: string): Promise<void> {
+  await call<null>(TimerJobsCommand.Delete, { id });
+}
+export async function toggleTimerJob(id: string, enabled: boolean): Promise<TimerJob> {
+  return call<TimerJob>(TimerJobsCommand.Toggle, { id, enabled });
+}
 // ── Notes ────────────────────────────────────────────────────────
 
 /** Create a new note. Returns the inserted note. */
