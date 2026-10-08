@@ -482,3 +482,79 @@ Stage Summary:
 - Features advanced: Study Reader (BROKEN_ROUTE → USEFUL), Archive (RUNTIME_PERMISSION_SECURITY_GAP → USEFUL+safe), Organizer (UNSAFE_COLLISION → USEFUL), Application Kit (replace now atomic), PDF Reorder/Reverse (ABSENT → USEFUL), PDF Metadata (FOUNDATION → USEFUL), PDF Page size (ABSENT → USEFUL), Image Watermark (ABSENT → USEFUL), Image Adjustments (ABSENT → USEFUL), USB (SHELL → FOUNDATION via copy_and_verify).
 
 Remaining (honest): the 90% target requires ~30+ more capabilities (Signature/Forms Vaults, Scanner, Screenshot, Study Packs, Notebook, Backup Recipes wire-up, Clipboard, Recipes, Timer, Paperu Send, Webpage→PDF, media utilities, business docs, licensing/updater/analytics, single-instance/open-with/window-state, annotations/redaction/compare, Portal flagship multi-constraint, Passport Photo). This sprint delivered the critical safety repairs + high-value PDF/image breadth + the foundational copy_and_verify primitive. Substantial progress toward 90% but not yet there.
+
+---
+Task ID: 90-sprint-continuation-checkpoint
+Agent: Builder (Z.ai Code)
+Task: 90% continuation sprint — fix 5 defects + Wave 4-6 feature breadth.
+
+## Checkpoint (session may terminate — this permits immediate resume)
+
+### Verified current SHA
+- HEAD: `8d4a83d` (feat(pdf): standalone watermark + page numbers route)
+- Branch: agent/builder, 100 ahead / 0 behind main
+- gh auth: hello-aditya-dev (token via stdin, never in files/commits)
+- Toolchain: gh 2.102.0, pnpm corepack shim, Rust 1.99.0 (matches rust-toolchain.toml)
+
+### Completed this continuation session
+- **5 defect fixes (§1, Windows-green on e4a2963)**:
+  - §1A: conflict resolver 9999-fallback returns None (never occupied original) + open_exclusive for no-replace.
+  - §1B: copy_and_verify order fixed (hash TEMP before rename, Err on mismatch, never verified:false).
+  - §1C: real adversarial ZIP Slip fixture (../evil.txt) + bounded_copy for streamed-byte ceilings.
+  - §1D: PDF reorder genuinely changes Kids array order (verified by test).
+  - §1E: Windows CI green on the defect-fix commit (6m8s).
+- **Wave 4 — Signature Vault (a148d1b)**: migration 0008 + signature_vault module (add/list/update/replace-atomic/remove) + 5 Tauri commands + contract + IPC + route + module-registry. 4 Rust tests.
+- **Wave 5 — USB Toolbox (8a03d1d)**: copy_and_verify Tauri command + route (native pickers, conflict-policy toggle, SHA-256 result). Module available.
+- **Wave 6 — PDF Watermark + Page Numbers (8d4a83d)**: standalone pdf-lib route (text watermark: 6 positions + diagonal, opacity, size; page numbers: start + position). Module available.
+
+### Test counts
+- Rust: 132 (was 121 → +4 signature_vault + 7 defect tests). All green.
+- Frontend: 134 (unchanged). All green.
+- CI: e4a2963 GREEN (6m8s), a148d1b/8a03d1d/8d4a83d in CI queue (concurrency cancels prior).
+
+### Uncompleted feature matrix rows (prioritized next tasks)
+1. **Forms Vault** — local-only reusable field values (name/address/email/phone). Mirror signature_vault CRUD pattern. Migration 0009. HIGH (Student, 22pts).
+2. **Clipboard History** — opt-in local capture, bounded, search/pin/delete/pause. Migration 0010. HIGH (File power, 18pts).
+3. **Backup Recipes** — sources/dest/include/exclude/dry-run/run/verify using copy_and_verify. Wire the primitive. HIGH (File power).
+4. **PDF Notebook** — blank/ruled/grid/dotted templates, page CRUD, text/image, Save As. MEDIUM (PDF, 18pts).
+5. **Document Scanner** — multi-image input → crop/rotate/brightness/contrast/grayscale/B&W/A4 → PDF. Reuses image-engine. MEDIUM (Student).
+6. **Screenshot Bridge** — pick screenshot → crop/rotate → Assignment/Shelf/Notes handoff. MEDIUM (Student).
+7. **Study Packs** — pack CRUD/items/sections/pin/search/missing-file. Schema exists (0006). MEDIUM (Student).
+8. **PDF Annotations** — text/freehand/shapes/highlight/underline/strike. pdf-lib + pdfjs. MEDIUM (PDF).
+9. **PDF Redaction** — render page → burn redaction → rebuild → validate text not recoverable. MEDIUM (PDF).
+10. **PDF Compare** — page count comparison + changed-page detection + side-by-side. MEDIUM (PDF).
+11. **Recipes** — typed allowlisted step graph + CRUD + dry-run + execute + history. MEDIUM (Automation, 10pts).
+12. **Timer Jobs** — one-time/daily/weekly + next-run + history. Schema exists. MEDIUM (Automation).
+13. **Paperu Send** — LAN server, opaque file IDs, 256-bit token, QR, expiry. MEDIUM (cross-device).
+14. **Webpage→PDF** — isolated Edge/Chromium headless, http/https only. MEDIUM.
+15. **Business docs** — invoice/quote/receipt templates + PDF export. LOW (Business, 3pts).
+16. **Licensing** — signed entitlement verification + activation/restore/offline cache. LOW (Commercial, 5pts).
+17. **Updater** — notify-only signed updater. LOW (Commercial).
+18. **Analytics** — opt-in privacy-safe desktop events. LOW (Commercial).
+19. **Single instance + Open With + file associations + window state** — Tauri plugins. MEDIUM (Platform, 12pts).
+20. **Portal Ready flagship** — multi-constraint pipeline (exact W/H + KB range + aspect + DPI + filename). HIGH (Student).
+21. **Passport/College Photo Studio** — crop/aspect/dimensions/KB/print sheet. HIGH (Student).
+22. **Utility-only media (FFmpeg)** — trim/compress/convert/extract audio. LGPL eval. LOW (Media).
+
+### Failing tests
+- None. All 132 Rust + 134 frontend tests pass.
+
+### CI run IDs
+- e4a2963 (defect fixes): GREEN (37730386567, 6m8s)
+- a148d1b (Signature Vault): run 37731323358 (cancelled by next push)
+- 8a03d1d (USB Toolbox): run 37731718475 (in progress)
+- 8d4a83d (PDF watermark): run 37732011514 (pending)
+
+### Resume instructions
+1. `cd /home/z/paperu && git checkout agent/builder && git pull --ff-only origin agent/builder`
+2. `export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"` (gh + pnpm + rust)
+3. `pnpm install --frozen-lockfile` (deps; canvas build-script ignore is expected)
+4. `pnpm run check` for the full gate (typecheck + lint + test + build + rust fmt + clippy + test:rust)
+5. Continue from "Uncompleted feature matrix rows" #1 (Forms Vault).
+6. After each feature: commit + push + `gh run list --branch agent/builder` + wait for Windows CI.
+7. The 5 defects are fixed + Windows-validated; do NOT re-fix them.
+8. copy_and_verify + conflict resolver are the shared safety primitives — reuse them in Backup/USB/Organizer/Archive.
+
+### External blockers
+- Authenticode certificate (unsigned release candidate only).
+- Production licensing/payment credentials (licensing-client protocol is a remaining task; no secrets embedded).
