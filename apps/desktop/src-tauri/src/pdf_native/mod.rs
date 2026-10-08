@@ -237,6 +237,60 @@ pub fn set_page_size(bytes: &[u8], width: f64, height: f64, pages: &[u32]) -> Re
     save_doc_to_bytes(doc)
 }
 
+/// Set the CropBox of every (or selected) page to a rectangular region.
+/// `pages` is 1-based; empty = all. The CropBox clips the visible area
+/// to [x, y, x+width, y+height] in PDF user-space units (1pt = 1/72").
+/// The page content isn't removed — only the visible region changes.
+pub fn crop_pages(
+    bytes: &[u8],
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    pages: &[u32],
+) -> Result<Vec<u8>> {
+    if width <= 0.0 || height <= 0.0 {
+        return Err(AppError::builder(
+            code::INVALID_INPUT,
+            ErrorCategory::Validation,
+            "Crop width and height must be positive.",
+        )
+        .build());
+    }
+    let mut doc = load_doc(bytes)?;
+    let all_pages = doc.get_pages();
+    let target: std::collections::HashSet<u32> = if pages.is_empty() {
+        all_pages.keys().copied().collect()
+    } else {
+        pages.iter().copied().collect()
+    };
+    let crop_box = vec![
+        Object::Real(x as f32),
+        Object::Real(y as f32),
+        Object::Real((x + width) as f32),
+        Object::Real((y + height) as f32),
+    ];
+    for (&page_num, &page_id) in &all_pages {
+        if !target.contains(&page_num) {
+            continue;
+        }
+        let page_dict = doc
+            .get_object_mut(page_id)
+            .and_then(|obj| obj.as_dict_mut())
+            .map_err(|e| {
+                AppError::builder(
+                    code::PROCESSING_FAILED,
+                    ErrorCategory::Processing,
+                    "Paperu couldn't read a page in that PDF.",
+                )
+                .technical(e.to_string())
+                .build()
+            })?;
+        page_dict.set("CropBox", Object::Array(crop_box.clone()));
+    }
+    save_doc_to_bytes(doc)
+}
+
 // ── Reorder / reverse pages — 90% §22 ─────────────────────────────
 
 /// Reorder pages to the given 1-based order. `order` must contain every
@@ -694,5 +748,40 @@ mod tests {
         let bytes = build_test_pdf(1);
         let out = reorder_pages(&bytes, &[1]).unwrap();
         assert_eq!(page_count(&out), 1);
+    }
+
+    #[test]
+    fn crop_pages_sets_cropbox() {
+        let bytes = build_test_pdf(2);
+        let out = crop_pages(&bytes, 50.0, 50.0, 200.0, 300.0, &[]).unwrap();
+        assert_eq!(page_count(&out), 2);
+        let doc = Document::load_mem(&out).unwrap();
+        let pages = doc.get_pages();
+        for page_id in pages.values() {
+            let page = doc.get_object(*page_id).unwrap();
+            let dict = page.as_dict().unwrap();
+            let crop = dict.get(b"CropBox").unwrap();
+            let arr = crop.as_array().unwrap();
+            assert_eq!(arr.len(), 4);
+            // x=50, y=50, x+w=250, y+h=350
+            let x = match &arr[0] {
+                Object::Real(r) => f64::from(*r),
+                Object::Integer(i) => *i as f64,
+                _ => 0.0,
+            };
+            let y = match &arr[1] {
+                Object::Real(r) => f64::from(*r),
+                Object::Integer(i) => *i as f64,
+                _ => 0.0,
+            };
+            assert!((x - 50.0).abs() < 1.0);
+            assert!((y - 50.0).abs() < 1.0);
+        }
+    }
+
+    #[test]
+    fn crop_pages_rejects_nonpositive() {
+        let bytes = build_test_pdf(1);
+        assert!(crop_pages(&bytes, 0.0, 0.0, 0.0, 100.0, &[]).is_err());
     }
 }

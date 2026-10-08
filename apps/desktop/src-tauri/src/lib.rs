@@ -221,6 +221,7 @@ mod runtime {
                 crate::commands::pdf_native::set_pdf_page_size,
                 crate::commands::pdf_native::reorder_pdf_pages,
                 crate::commands::pdf_native::reverse_pdf_pages,
+                crate::commands::pdf_native::crop_pdf_pages,
                 crate::commands::watch::start_watch_folder,
                 crate::commands::watch::stop_watch_folder,
                 crate::commands::watch::current_watch_folder,

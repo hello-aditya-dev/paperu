@@ -109,3 +109,17 @@ pub fn reverse_pdf_pages(path: String) -> Result<PdfNativeResponse> {
     let out = pdf_native::reverse_pages(&bytes)?;
     Ok(PdfNativeResponse::from_bytes(out))
 }
+
+#[tauri::command]
+pub fn crop_pdf_pages(
+    path: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    pages: Vec<u32>,
+) -> Result<PdfNativeResponse> {
+    let bytes = read_source(&path)?;
+    let out = pdf_native::crop_pages(&bytes, x, y, width, height, &pages)?;
+    Ok(PdfNativeResponse::from_bytes(out))
+}

@@ -26,11 +26,12 @@ import {
   revealPath,
   reversePdfPages,
   rotatePdfPages,
+  cropPdfPages,
   setPdfPageSize,
 } from "@/lib/ipc";
 import { Button, Card } from "@paperu/ui";
 
-type Mode = "rotate" | "delete" | "extract" | "reorder" | "reverse" | "page-size" | "metadata";
+type Mode = "rotate" | "delete" | "extract" | "reorder" | "reverse" | "page-size" | "crop" | "metadata";
 
 const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
   { id: "rotate", label: "Rotate" },
@@ -39,6 +40,7 @@ const MODES: ReadonlyArray<{ id: Mode; label: string }> = [
   { id: "reorder", label: "Reorder" },
   { id: "reverse", label: "Reverse" },
   { id: "page-size", label: "Page size" },
+  { id: "crop", label: "Crop" },
   { id: "metadata", label: "Metadata" },
 ];
 
@@ -76,6 +78,11 @@ export function PdfPageOpsRoute(): React.ReactNode {
   const [pageSize, setPageSize] = useState<keyof typeof PAGE_SIZES>("a4");
   const [customW, setCustomW] = useState("");
   const [customH, setCustomH] = useState("");
+  // Crop
+  const [cropX, setCropX] = useState("50");
+  const [cropY, setCropY] = useState("50");
+  const [cropW, setCropW] = useState("400");
+  const [cropH, setCropH] = useState("600");
   const [metadata, setMetadata] = useState<PdfMetadata | null>(null);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +146,13 @@ export function PdfPageOpsRoute(): React.ReactNode {
         res = await reorderPdfPages(file.path, parsed);
       } else if (mode === "reverse") {
         res = await reversePdfPages(file.path);
+      } else if (mode === "crop") {
+        const x = parseFloat(cropX) || 0;
+        const y = parseFloat(cropY) || 0;
+        const w = parseFloat(cropW) || 0;
+        const h = parseFloat(cropH) || 0;
+        if (w <= 0 || h <= 0) { setError("Enter valid crop width + height."); return; }
+        res = await cropPdfPages(file.path, x, y, w, h, []);
       } else if (mode === "page-size") {
         const w = customW ? parseFloat(customW) : PAGE_SIZES[pageSize].width;
         const h = customH ? parseFloat(customH) : PAGE_SIZES[pageSize].height;
@@ -227,6 +241,17 @@ export function PdfPageOpsRoute(): React.ReactNode {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--paperu-space-2)", marginTop: "var(--paperu-space-3)" }}>
                   <input className="paperu-target__input" placeholder={`Custom width (blank = ${PAGE_SIZES[pageSize].width})`} value={customW} onChange={(e) => setCustomW(e.target.value.replace(/[^0-9.]/g, ""))} />
                   <input className="paperu-target__input" placeholder={`Custom height (blank = ${PAGE_SIZES[pageSize].height})`} value={customH} onChange={(e) => setCustomH(e.target.value.replace(/[^0-9.]/g, ""))} />
+                </div>
+              </div>
+            )}
+            {mode === "crop" && (
+              <div style={{ marginTop: "var(--paperu-space-3)" }}>
+                <span className="paperu-text-label">Crop pages (CropBox — visible region)</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--paperu-space-2)", marginTop: "var(--paperu-space-2)" }}>
+                  <input className="paperu-target__input" placeholder="X (pt)" value={cropX} onChange={(e) => setCropX(e.target.value.replace(/[^0-9.]/g, ""))} />
+                  <input className="paperu-target__input" placeholder="Y (pt)" value={cropY} onChange={(e) => setCropY(e.target.value.replace(/[^0-9.]/g, ""))} />
+                  <input className="paperu-target__input" placeholder="Width (pt)" value={cropW} onChange={(e) => setCropW(e.target.value.replace(/[^0-9.]/g, ""))} />
+                  <input className="paperu-target__input" placeholder="Height (pt)" value={cropH} onChange={(e) => setCropH(e.target.value.replace(/[^0-9.]/g, ""))} />
                 </div>
               </div>
             )}

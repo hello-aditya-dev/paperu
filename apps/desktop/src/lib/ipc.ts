@@ -598,6 +598,18 @@ export async function reorderPdfPages(
 }
 
 /** Reverse the page order (last page first). */
+/** Crop pages to a rectangular region (sets CropBox). */
+export async function cropPdfPages(
+  path: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  pages: readonly number[],
+): Promise<PdfNativeResponse> {
+  return call<PdfNativeResponse>(PdfNativeCommand.Crop, { path, x, y, width, height, pages });
+}
+
 export async function reversePdfPages(path: string): Promise<PdfNativeResponse> {
   return call<PdfNativeResponse>(PdfNativeCommand.Reverse, { path });
 }

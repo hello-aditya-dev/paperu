@@ -35,6 +35,7 @@ export const PdfNativeCommand = {
   SetPageSize: "set_pdf_page_size",
   Reorder: "reorder_pdf_pages",
   Reverse: "reverse_pdf_pages",
+  Crop: "crop_pdf_pages",
 } as const;
 
 /** Standard PDF page sizes (width × height in points, 1pt = 1/72"). */
