@@ -104,6 +104,21 @@ mod runtime {
     pub fn run() {
         tauri::Builder::default()
             .plugin(tauri_plugin_dialog::init())
+            .plugin(tauri_plugin_window_state::Builder::default().build())
+            .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+                // 90% §16-17: second launch — focus existing window + route
+                // any file argument to the Reader via the frontend.
+                let _ = app.get_webview_window("main").and_then(|w| {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                    Some(())
+                });
+                // If a file path was passed as an argument (Open With),
+                // emit it to the frontend for staging + navigation.
+                if let Some(path) = args.iter().find(|a| !a.starts_with('-')) {
+                    let _ = app.emit("paperu://open-file", path.to_string());
+                }
+            }))
             .setup(|app| {
                 let app_data_dir = resolve_app_data_dir(app.handle());
                 std::fs::create_dir_all(&app_data_dir).ok();
