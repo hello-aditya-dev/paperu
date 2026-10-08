@@ -100,9 +100,7 @@ pub fn execute_recipe(
 ) -> Result<RecipeRunResult> {
     // Generate a run ID + register it with the cancellation registry.
     let run_id = cancel::new_run_id();
-    let total_steps = recipes::list_steps(&state.db, &id)
-        .map(|s| s.len())
-        .unwrap_or(0);
+    let total_steps = recipes::list_steps(&state.db, &id).map_or(0, |s| s.len());
     let app_handle = app.clone();
     let recipe_id_for_cb = id.clone();
     let run_id_for_cb = run_id.clone();
