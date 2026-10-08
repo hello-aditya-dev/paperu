@@ -4,3 +4,10 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# pnpm 12.x: canvas@3.2.3 has build scripts that pnpm refuses to
+# silently ignore (ERR_PNPM_IGNORED_BUILDS). dangerouslyAllowAllBuilds
+# tells pnpm to NOT error on ignored builds — canvas's native build
+# is not needed at install time (pdfjs uses it only at runtime for
+# canvas rendering, which the Tauri WebView provides natively).
+dangerouslyAllowAllBuilds: true

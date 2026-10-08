@@ -82,13 +82,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          # pnpm 12.9.1 errors on ignored build scripts (canvas).
-          # The canvas package is listed in package.json's
-          # ignoredBuiltDependencies — we acknowledge it + don't
-          # want pnpm to error. This env var downgrades the error
-          # to a warning.
-          PNPM_CONFIG_IGNORE_BUILDS_ERROR: "false"
 
       - name: Frontend typecheck
         run: pnpm run typecheck
