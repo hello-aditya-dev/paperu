@@ -81,7 +81,7 @@ jobs:
           workspaces: "apps/desktop/src-tauri"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile
 
       - name: Frontend typecheck
         run: pnpm run typecheck
