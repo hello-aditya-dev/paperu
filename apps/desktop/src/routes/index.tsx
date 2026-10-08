@@ -101,6 +101,7 @@ const DownloadsCleanerRoute = lazy(() => import("./DownloadsCleanerRoute").then(
 const FolderOrganizerRoute = lazy(() => import("./FolderOrganizerRoute").then((m) => ({ default: m.FolderOrganizerRoute })));
 const CitationStudioRoute = lazy(() => import("./CitationStudioRoute").then((m) => ({ default: m.CitationStudioRoute })));
 const StudyPacksRoute = lazy(() => import("./StudyPacksRoute").then((m) => ({ default: m.StudyPacksRoute })));
+const PassportPhotoRoute = lazy(() => import("./PassportPhotoRoute").then((m) => ({ default: m.PassportPhotoRoute })));
 const PdfNotebookRoute = lazy(() => import("./PdfNotebookRoute").then((m) => ({ default: m.PdfNotebookRoute })));
 const WebpageToPdfRoute = lazy(() => import("./WebpageToPdfRoute").then((m) => ({ default: m.WebpageToPdfRoute })));
 const ScreenshotBridgeRoute = lazy(() => import("./ScreenshotBridgeRoute").then((m) => ({ default: m.ScreenshotBridgeRoute })));
@@ -166,6 +167,7 @@ export const router = createHashRouter([
         path: "assignment",
         element: withSuspense(<AssignmentStudioRoute />),
       },
+{ path: "passport-photo", element: withSuspense(<PassportPhotoRoute />) },
       { path: "portal", element: withSuspense(<PortalReadyRoute />) },
       { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
       // Reader resolves the path from a ?path= query param, the staged
