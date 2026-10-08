@@ -31,7 +31,6 @@ import { basename } from "@/lib/platform";
 import { useWorkingFile } from "@/lib/working-file";
 
 const OPEN_FILE_EVENT = "paperu://open-file";
-const CONSUME_COMMAND = "consume_open_with_event";
 
 const PDF_EXTENSIONS: ReadonlySet<string> = new Set(["pdf"]);
 const IMAGE_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -153,27 +152,11 @@ export function initOpenWithListener(
   let unlisten: UnlistenFn | null = null;
   let cancelled = false;
 
-  // Pop the initial-launch queue. Calling `consume_open_with_event`
-  // both signals "frontend ready" and retrieves the path (if any)
-  // that Rust queued during setup.
-  void (async () => {
-    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
-      return; // Outside Tauri — no-op.
-    }
-    try {
-      const { invoke } = await import("@tauri-apps/api/core");
-      const queued = (await invoke(CONSUME_COMMAND)) as string | null;
-      if (cancelled) return;
-      if (queued) {
-        await stageAndNavigate(navigate, queued);
-      }
-    } catch (err) {
-      console.warn("[open-with] consume_open_with_event failed", err);
-    }
-  })();
-
-  // Listen for live `paperu://open-file` events from subsequent
-  // launches (second instance → single-instance callback → emit).
+  // Register the live listener. The Rust setup hook emits the
+  // initial-launch file path via a delayed async task (500ms) so the
+  // frontend has time to register this listener. Subsequent launches
+  // (second instance) emit immediately via the single-instance
+  // callback — the same listener catches those.
   listen<string>(OPEN_FILE_EVENT, (event) => {
     if (cancelled) return;
     const payload = event.payload;
@@ -189,8 +172,7 @@ export function initOpenWithListener(
       else unlisten = un;
     })
     .catch(() => {
-      // Outside Tauri or listener setup failed — the consume call
-      // above is the fallback for the initial-launch case.
+      // Outside Tauri or listener setup failed — no-op.
     });
 
   return () => {

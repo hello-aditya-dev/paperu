@@ -176,7 +176,6 @@ mod runtime {
                     db: db.clone(),
                     tasks: crate::tasks::TaskRegistry::new(),
                     app_data_dir,
-                    open_with_queue: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
                 };
                 app.manage(state);
 
@@ -193,19 +192,20 @@ mod runtime {
                 if let Some(raw_arg) = std::env::args().skip(1).find(|a| !a.starts_with('-')) {
                     match crate::commands::open_with::validate_open_with_path(&raw_arg) {
                         Ok(validated) => {
-                            let payload = validated.to_string_lossy().into_owned();
-                            // Clone the AppHandle (cheap, breaks the
-                            // lifetime chain from `&mut App`) → get the
-                            // Tauri-managed AppState → clone the Arc
-                            // queue handle → lock independently. Each
-                            // step produces an owned value so there's
-                            // no borrowed-temporary lifetime issue.
+                            // Emit the initial-launch file path via a
+                            // delayed async task. The frontend registers
+                            // its `paperu://open-file` listener on mount
+                            // (~100ms after setup). A 500ms delay gives
+                            // it time to register without racing.
+                            // This avoids the lifetime chain issue
+                            // with accessing AppState.open_with_queue
+                            // from within the setup closure.
                             let handle = app.handle().clone();
-                            let state = handle.state::<AppState>();
-                            let queue = state.open_with_queue.clone();
-                            if let Ok(mut guard) = queue.lock() {
-                                guard.push(payload);
-                            }
+                            let payload = validated.to_string_lossy().into_owned();
+                            tauri::async_runtime::spawn(async move {
+                                std::thread::sleep(std::time::Duration::from_millis(500));
+                                let _ = handle.emit("paperu://open-file", payload);
+                            });
                         }
                         Err(err) => {
                             tracing::warn!(
@@ -234,7 +234,6 @@ mod runtime {
                 Ok(())
             })
             .invoke_handler(tauri::generate_handler![
-                crate::commands::open_with::consume_open_with_event,
                 crate::commands::inspect::inspect_file,
                 crate::commands::finalize::finalize_output,
                 crate::commands::read_file::read_file_bytes,
