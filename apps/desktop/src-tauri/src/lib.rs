@@ -174,7 +174,7 @@ mod runtime {
                     db: db.clone(),
                     tasks: crate::tasks::TaskRegistry::new(),
                     app_data_dir,
-                    open_with_queue: std::sync::Mutex::new(Vec::new()),
+                    open_with_queue: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
                 };
                 app.manage(state);
 
@@ -192,9 +192,12 @@ mod runtime {
                     match crate::commands::open_with::validate_open_with_path(&raw_arg) {
                         Ok(validated) => {
                             let payload = validated.to_string_lossy().into_owned();
-                            let state = app.state::<AppState>();
-                            if let Ok(mut q) = state.open_with_queue.lock() {
-                                q.push(payload);
+                            // Clone the Arc handle out of the Tauri-managed
+                            // State guard (breaks the lifetime chain from
+                            // `app`) + lock independently.
+                            let q = app.state::<AppState>().open_with_queue.clone();
+                            if let Ok(mut guard) = q.lock() {
+                                guard.push(payload);
                             }
                         }
                         Err(err) => {

@@ -173,7 +173,7 @@ pub fn consume_open_with_event(
     let mut q = state
         .open_with_queue
         .lock()
-        .map_err(crate::errors::AppError::unknown)?;
+        .map_err(|e| crate::errors::AppError::unknown(&e))?;
     Ok(q.pop())
 }
 
