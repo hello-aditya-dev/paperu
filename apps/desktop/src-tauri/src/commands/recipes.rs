@@ -137,12 +137,10 @@ pub fn execute_recipe(
     // Emit a final progress event with the result status.
     let final_status = result
         .as_ref()
-        .map(|r| r.status.clone())
-        .unwrap_or_else(|e| "failure".to_string());
+        .map_or_else(|_| "failure".to_string(), |r| r.status.clone());
     let final_msg = result
         .as_ref()
-        .map(|r| r.message.clone())
-        .unwrap_or_else(|e| e.message.clone());
+        .map_or_else(|e| e.message.clone(), |r| r.message.clone());
     let _ = tauri::Emitter::emit(
         &app,
         RECIPE_PROGRESS_CHANNEL,
