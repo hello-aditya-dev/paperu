@@ -37,6 +37,8 @@ import type {
   RescueDiagnosis,
   Settings,
   SignatureItem,
+  CopyVerifyResult,
+  CopyVerifyRequest,
   AddSignatureRequest,
   UpdateSignatureRequest,
   SettingsPatch,
@@ -57,6 +59,7 @@ import {
   RecentWorkCommand,
   RescueCommand,
   SignatureVaultCommand,
+  UsbToolboxCommand,
   WatchCommand,
   isAppError,
   appError as buildAppError,
@@ -608,6 +611,16 @@ export async function currentWatchFolder(): Promise<string | null> {
 
 // NOTE: `base64ToBytes` already exists above (near readFileBytes) —
 // the PdfPageOpsRoute imports it from there. No duplicate here.
+
+
+// ── USB Toolbox / shared copy+verify (90% §52-53) ─────────────────
+
+/** Copy a file to a destination with SHA-256 verification. Conflict-safe
+ *  (default Rename, never overwrites). Source never modified. Returns the
+ *  final destination + both SHA-256 hashes + verified flag. */
+export async function copyAndVerifyFile(request: CopyVerifyRequest): Promise<CopyVerifyResult> {
+  return call<CopyVerifyResult>(UsbToolboxCommand.CopyVerify, { request });
+}
 
 // ── Notes ────────────────────────────────────────────────────────
 

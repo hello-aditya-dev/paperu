@@ -30,3 +30,4 @@ export * from "./archive_studio.js";
 export * from "./pdf_native.js";
 export * from "./watch.js";
 export * from "./signature_vault.js";
+export * from "./usb_toolbox.js";

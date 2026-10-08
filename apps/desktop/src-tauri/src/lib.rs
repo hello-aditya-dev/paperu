@@ -211,6 +211,7 @@ mod runtime {
                 crate::commands::signature_vault::update_signature_item,
                 crate::commands::signature_vault::replace_signature_item,
                 crate::commands::signature_vault::remove_signature_item,
+                crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())
             .expect("Paperu failed to start");
