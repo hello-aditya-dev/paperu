@@ -32,30 +32,7 @@
       "freezePrototype": false,
       "dangerousDisableAssetCspModification": false
     },
-    "trayIcon": null,
-    "fileAssociations": [
-      {
-        "name": "PDF",
-        "ext": [
-          "pdf"
-        ],
-        "description": "PDF document",
-        "role": "Viewer"
-      },
-      {
-        "name": "Image",
-        "ext": [
-          "jpg",
-          "jpeg",
-          "png",
-          "webp",
-          "bmp",
-          "gif"
-        ],
-        "description": "Image file",
-        "role": "Viewer"
-      }
-    ]
+    "trayIcon": null
   },
   "bundle": {
     "active": true,
@@ -92,7 +69,30 @@
         "type": "downloadBootstrapper"
       }
     },
-    "createUpdaterArtifacts": false
+    "createUpdaterArtifacts": false,
+    "fileAssociations": [
+      {
+        "name": "PDF",
+        "ext": [
+          "pdf"
+        ],
+        "description": "PDF document",
+        "role": "Viewer"
+      },
+      {
+        "name": "Image",
+        "ext": [
+          "jpg",
+          "jpeg",
+          "png",
+          "webp",
+          "bmp",
+          "gif"
+        ],
+        "description": "Image file",
+        "role": "Viewer"
+      }
+    ]
   },
   "plugins": {}
 }
