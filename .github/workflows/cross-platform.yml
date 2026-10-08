@@ -1,0 +1,164 @@
+name: Cross-platform native build
+
+on:
+  push:
+    branches: [agent/builder]
+  pull_request:
+    branches: [agent/builder]
+
+# Cancel in-progress runs for the same branch (saves CI minutes).
+concurrency:
+  group: cross-platform-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            label: windows-x64
+            bundles: nsis,msi
+            rust-target: x86_64-pc-windows-msvc
+          - os: macos-15
+            label: macos-arm64
+            bundles: app,dmg
+            rust-target: aarch64-apple-darwin
+          - os: macos-13
+            label: macos-x64
+            bundles: app,dmg
+            rust-target: x86_64-apple-darwin
+          - os: ubuntu-22.04
+            label: linux-x64
+            bundles: deb,appimage
+            rust-target: x86_64-unknown-linux-gnu
+
+    runs-on: ${{ matrix.os }}
+    name: Native build (${{ matrix.label }})
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.9.1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - name: Install Linux native dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libxdo-dev \
+            build-essential \
+            pkg-config \
+            curl \
+            wget \
+            file \
+            patchelf \
+            xdg-utils
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pnpm/store
+            ~/.pnpm-store
+          key: pnpm-${{ matrix.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ matrix.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm run typecheck
+
+      - name: Frontend lint
+        run: pnpm run lint
+
+      - name: Frontend test
+        run: pnpm run test
+
+      - name: Frontend build
+        run: pnpm run build
+
+      - name: Rust fmt check
+        working-directory: apps/desktop/src-tauri
+        run: cargo fmt --all -- --check
+
+      - name: Clippy (with tauri-runtime)
+        working-directory: apps/desktop/src-tauri
+        run: cargo clippy --all-targets --features tauri-runtime -- -D warnings
+
+      - name: Rust tests (with tauri-runtime)
+        working-directory: apps/desktop/src-tauri
+        run: cargo test --workspace --features tauri-runtime
+
+      - name: Build Tauri native bundles
+        working-directory: apps/desktop
+        run: pnpm tauri build --features tauri-runtime --bundles ${{ matrix.bundles }}
+        env:
+          # Prevent macOS code-signing prompts in CI (unsigned engineering builds).
+          APPLE_SIGNING_IDENTITY: ""
+          APPLE_CERTIFICATE: ""
+
+      - name: Assert artifacts exist
+        shell: bash
+        working-directory: apps/desktop/src-tauri/target/release/bundle
+        run: |
+          set -e
+          case "${{ matrix.label }}" in
+            windows-x64)
+              test -d nsis && test -d msi
+              ls nsis/*.exe msi/*.msi
+              ;;
+            macos-*)
+              test -d dmg && test -d macos
+              ls dmg/*.dmg macos/*.app
+              ;;
+            linux-x64)
+              test -d deb && test -d appimage
+              ls deb/*.deb appimage/*.AppImage
+              ;;
+          esac
+
+      - name: Generate SHA-256 sums
+        shell: bash
+        working-directory: apps/desktop/src-tauri/target/release/bundle
+        run: |
+          find . -type f \( -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" \) -exec sha256sum {} \; > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: paperu-${{ matrix.label }}-${{ github.sha }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*.exe
+            apps/desktop/src-tauri/target/release/bundle/**/*.msi
+            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/**/*.deb
+            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/sha256sums.txt
+          if-no-files-found: error

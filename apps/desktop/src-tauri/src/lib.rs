@@ -73,6 +73,7 @@ pub mod notes;
 #[allow(clippy::all)]
 pub mod organizer;
 pub mod pdf_native;
+pub mod platform;
 pub mod product;
 pub mod reading_history;
 pub mod recent_work;

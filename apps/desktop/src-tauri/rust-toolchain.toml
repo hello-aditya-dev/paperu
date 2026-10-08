@@ -1,0 +1,20 @@
+# Paperu — Rust toolchain pinning
+#
+# Pinned for reproducible builds across Linux, macOS, and Windows.
+# Cross-platform CI installs the additional per-OS targets via
+# `dtolnay/rust-toolchain` with `targets:` — this file pins the
+# base toolchain version + components.
+
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
+# Cross-platform targets — all four are installed so a single agent
+# can build for any platform (the actual build uses the host's
+# native target unless cross-compiling).
+targets = [
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+]
