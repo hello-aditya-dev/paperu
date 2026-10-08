@@ -39,6 +39,8 @@ import type {
   SignatureItem,
   CopyVerifyResult,
   CopyVerifyRequest,
+  FormField,
+  UpsertFieldRequest,
   AddSignatureRequest,
   UpdateSignatureRequest,
   SettingsPatch,
@@ -50,6 +52,7 @@ import {
   ApplicationKitCommand,
   ArchiveCommand,
   CleanerCommand,
+  FormsVaultCommand,
   CommandName,
   DuplicateCommand,
   NotesCommand,
@@ -620,6 +623,29 @@ export async function currentWatchFolder(): Promise<string | null> {
  *  final destination + both SHA-256 hashes + verified flag. */
 export async function copyAndVerifyFile(request: CopyVerifyRequest): Promise<CopyVerifyResult> {
   return call<CopyVerifyResult>(UsbToolboxCommand.CopyVerify, { request });
+}
+
+
+// ── Forms Vault (local-only reusable field values, 90% §38) ──────
+
+/** Upsert a field by key (insert or update). */
+export async function upsertFormsField(request: UpsertFieldRequest): Promise<FormField> {
+  return call<FormField>(FormsVaultCommand.Upsert, { request });
+}
+
+/** List all saved form fields, ordered by key. */
+export async function listFormsFields(): Promise<FormField[]> {
+  return call<FormField[]>(FormsVaultCommand.List);
+}
+
+/** Remove a single field by id. */
+export async function removeFormsField(id: string): Promise<void> {
+  await call<null>(FormsVaultCommand.Remove, { id });
+}
+
+/** Clear all form fields. */
+export async function clearFormsFields(): Promise<void> {
+  await call<null>(FormsVaultCommand.Clear);
 }
 
 // ── Notes ────────────────────────────────────────────────────────

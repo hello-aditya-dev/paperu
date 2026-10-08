@@ -24,6 +24,8 @@ pub mod duplicate_finder;
 #[cfg(feature = "tauri-runtime")]
 pub mod file_rescue;
 pub mod finalize;
+#[cfg(feature = "tauri-runtime")]
+pub mod forms_vault;
 pub mod inspect;
 #[cfg(feature = "tauri-runtime")]
 pub mod notes;
@@ -63,6 +65,8 @@ pub use duplicate_finder::*;
 #[cfg(feature = "tauri-runtime")]
 pub use file_rescue::*;
 pub use finalize::*;
+#[cfg(feature = "tauri-runtime")]
+pub use forms_vault::*;
 pub use inspect::*;
 #[cfg(feature = "tauri-runtime")]
 pub use notes::*;

@@ -31,3 +31,4 @@ export * from "./pdf_native.js";
 export * from "./watch.js";
 export * from "./signature_vault.js";
 export * from "./usb_toolbox.js";
+export * from "./forms_vault.js";

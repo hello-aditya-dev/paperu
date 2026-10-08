@@ -63,6 +63,7 @@ pub mod errors;
 #[allow(clippy::all)]
 pub mod file_rescue;
 pub mod filesystem;
+pub mod forms_vault;
 pub mod licensing;
 pub mod logging;
 pub mod notes;
@@ -211,6 +212,10 @@ mod runtime {
                 crate::commands::signature_vault::update_signature_item,
                 crate::commands::signature_vault::replace_signature_item,
                 crate::commands::signature_vault::remove_signature_item,
+                crate::commands::forms_vault::upsert_forms_field,
+                crate::commands::forms_vault::list_forms_fields,
+                crate::commands::forms_vault::remove_forms_field,
+                crate::commands::forms_vault::clear_forms_fields,
                 crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())

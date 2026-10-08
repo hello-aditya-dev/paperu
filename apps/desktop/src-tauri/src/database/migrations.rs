@@ -61,10 +61,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "signature_vault",
         sql: include_str!("../../migrations/0008_signature_vault.sql"),
     },
+    Migration {
+        version: 9,
+        label: "forms_vault",
+        sql: include_str!("../../migrations/0009_forms_vault.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 8;
+pub const LATEST_VERSION: u32 = 9;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
