@@ -667,3 +667,56 @@ Task: 100% implementation sprint — session 3 (defect-5 + 13 new features).
 5. After each feature: commit + push + check Windows CI.
 6. The 5 defects are ALL FIXED + Windows-validated. Do NOT re-fix.
 7. The commands-blind-spot (gated #![cfg(feature="tauri-runtime")] files only compiled on Windows CI) remains — test non-gated modules locally + rely on Windows CI for gated code.
+
+---
+Task ID: 100-sprint-session-3-final-checkpoint
+Agent: Builder (Z.ai Code)
+Task: 100% sprint session 3 — final checkpoint before context limit.
+
+## Final SHA
+6f4677a (fix(analytics): ORDER BY rowid DESC)
+
+## Session 3 complete (14 new items)
+1. Defect 5: ROUTE_PATHS export + real route resolution test
+2. BUSINESS-01-04: BusinessDocsRoute (invoices/quotes/receipts)
+3. PDF-22/File-14: PdfCompareRoute (page count + side-by-side)
+4. FILE-13: MetadataStudioRoute (unified image/PDF metadata)
+5. PLATFORM-02: tauri-plugin-single-instance
+6. PLATFORM-03: Open With file arg routing
+7. PLATFORM-04: File associations (bundle.fileAssociations)
+8. PLATFORM-05: tauri-plugin-window-state
+9. PDF-08: crop_pages (lopdf CropBox) + 2 tests
+10. AUTOMATION-04: Timer Jobs (CRUD + next_run calculator) + 4 tests
+11. COMMERCIAL-04: Analytics (local opt-in event store) + 1 test
+12. Fixed: fileAssociations app→bundle (Windows CI)
+13. Fixed: 'use tauri::Emitter' in run() (Windows CI)
+14. Fixed: analytics ORDER BY rowid DESC (timestamp collision)
+
+## Test counts (final)
+- Rust: 148 (was 101 at sprint start → +47 across all sessions)
+- Frontend: 134 (was 110 → +24)
+- Migrations: 10 (was 6 → +4: organizer_conflict, signature_vault, forms_vault, analytics)
+
+## Total items implemented across all sessions: ~83-87 of 93
+The remaining ~6-10 are the COMPLEX items requiring external binaries or advanced algorithms:
+- PDF-13/14 Password protect/unlock (qpdf sidecar — complex)
+- PDF-17 Annotations (pdf-lib — moderate)
+- PDF-18 Destructive redaction (render→burn→rebuild — complex)
+- STUDENT-13 Paperu Send (secure LAN transfer — complex security)
+- MEDIA-01 FFmpeg utilities (external binary bundling — complex)
+- WEB-01 Webpage→PDF (isolated browser — complex)
+- AUTOMATION-02 Recipes (typed workflow engine — moderate)
+- AUTOMATION-03 Watch rule→recipe (moderate — needs recipe engine)
+- COMMERCIAL-02 Activation/restore (signed entitlement — moderate)
+- COMMERCIAL-03 Updater (signed update — moderate)
+
+Plus external blockers: RELEASE-02 (Authenticode cert), RELEASE-03 (Windows runtime QA).
+
+## Resume instructions
+1. cd /home/z/paperu && git checkout agent/builder && git pull --ff-only origin agent/builder
+2. export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH" + pnpm install --frozen-lockfile
+3. pnpm run check (full gates: typecheck+lint+test+build+fmt+clippy+test:rust)
+4. Continue from "Remaining ~6-10" — start with PDF-07 Insert pages (pdf-lib copyPages, pure frontend, moderate).
+5. The 5 defects are ALL FIXED. Do NOT re-fix.
+6. The commands-blind-spot (gated files only compiled on Windows CI) remains.
+7. For complex items (Paperu Send, FFmpeg, Webpage→PDF, redaction): these need external binary bundling or complex security design. Implement the code paths + mark them BLOCKED_EXTERNAL where they need external resources.
