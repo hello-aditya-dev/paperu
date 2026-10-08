@@ -37,3 +37,4 @@ export * from "./backup_recipes.js";
 export * from "./timer_jobs.js";
 export * from "./clipboard_history.js";
 export * from "./analytics.js";
+export * from "./recipes.js";

@@ -60,6 +60,14 @@ import type {
   UpdateApplicationKitItemRequest,
   UpdateNoteRequest,
   UpdateReadingHistoryRequest,
+  RecipeOperationKind,
+  Recipe,
+  RecipePreview,
+  RecipeRunHistory,
+  RecipeRunResult,
+  RecipeStep,
+  UpdateRecipeRequest,
+  CreateTypedRecipeRequest,
 } from "@paperu/contracts";
 import {
   ApplicationKitCommand,
@@ -82,6 +90,7 @@ import {
   AnalyticsCommand,
   UsbToolboxCommand,
   WatchCommand,
+  RecipesCommand,
   isAppError,
   appError as buildAppError,
   ErrorCategory,
@@ -712,6 +721,48 @@ export async function deleteBackupRecipe(id: string): Promise<void> {
 }
 export async function runBackupRecipe(id: string): Promise<BackupRunResult> {
   return call<BackupRunResult>(BackupRecipesCommand.Run, { id });
+}
+
+
+// ── Typed Recipe Engine (P5e, AUTOMATION-02) ────────────────────
+export async function createRecipe(request: CreateTypedRecipeRequest): Promise<Recipe> {
+  return call<Recipe>(RecipesCommand.Create, { request });
+}
+export async function listRecipes(): Promise<Recipe[]> {
+  return call<Recipe[]>(RecipesCommand.List);
+}
+export async function getRecipe(id: string): Promise<Recipe> {
+  return call<Recipe>(RecipesCommand.Get, { id });
+}
+export async function updateRecipe(request: UpdateRecipeRequest): Promise<Recipe> {
+  return call<Recipe>(RecipesCommand.Update, { request });
+}
+export async function deleteRecipe(id: string): Promise<void> {
+  await call<null>(RecipesCommand.Delete, { id });
+}
+export async function addRecipeStep(
+  recipeId: string,
+  operation: RecipeOperationKind,
+): Promise<RecipeStep> {
+  return call<RecipeStep>(RecipesCommand.AddStep, { recipeId, operation });
+}
+export async function listRecipeSteps(recipeId: string): Promise<RecipeStep[]> {
+  return call<RecipeStep[]>(RecipesCommand.ListSteps, { recipeId });
+}
+export async function deleteRecipeStep(id: string): Promise<void> {
+  await call<null>(RecipesCommand.DeleteStep, { id });
+}
+export async function reorderRecipeSteps(recipeId: string, stepIds: string[]): Promise<void> {
+  await call<null>(RecipesCommand.ReorderSteps, { recipeId, stepIds });
+}
+export async function previewRecipe(id: string): Promise<RecipePreview> {
+  return call<RecipePreview>(RecipesCommand.Preview, { id });
+}
+export async function executeRecipe(id: string, inputPaths: string[]): Promise<RecipeRunResult> {
+  return call<RecipeRunResult>(RecipesCommand.Execute, { id, inputPaths });
+}
+export async function listRecipeRunHistory(id: string, limit?: number): Promise<RecipeRunHistory[]> {
+  return call<RecipeRunHistory[]>(RecipesCommand.ListRunHistory, { id, limit });
 }
 
 

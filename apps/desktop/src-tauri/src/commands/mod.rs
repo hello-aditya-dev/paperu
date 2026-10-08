@@ -47,6 +47,8 @@ pub mod reading_history;
 #[cfg(feature = "tauri-runtime")]
 pub mod recent_work;
 #[cfg(feature = "tauri-runtime")]
+pub mod recipes;
+#[cfg(feature = "tauri-runtime")]
 pub mod rename;
 pub mod save_as;
 #[cfg(feature = "tauri-runtime")]
@@ -98,6 +100,8 @@ pub use read_file::*;
 pub use reading_history::*;
 #[cfg(feature = "tauri-runtime")]
 pub use recent_work::*;
+#[cfg(feature = "tauri-runtime")]
+pub use recipes::*;
 #[cfg(feature = "tauri-runtime")]
 pub use rename::*;
 pub use save_as::*;

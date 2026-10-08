@@ -76,6 +76,7 @@ pub mod pdf_native;
 pub mod product;
 pub mod reading_history;
 pub mod recent_work;
+pub mod recipes;
 #[allow(clippy::all)]
 pub mod rename;
 pub mod security;
@@ -314,6 +315,18 @@ mod runtime {
                 crate::commands::backup_recipes::list_backup_recipes,
                 crate::commands::backup_recipes::delete_backup_recipe,
                 crate::commands::backup_recipes::run_backup_recipe,
+                crate::commands::recipes::create_recipe,
+                crate::commands::recipes::list_recipes,
+                crate::commands::recipes::get_recipe,
+                crate::commands::recipes::update_recipe,
+                crate::commands::recipes::delete_recipe,
+                crate::commands::recipes::add_recipe_step,
+                crate::commands::recipes::list_recipe_steps,
+                crate::commands::recipes::delete_recipe_step,
+                crate::commands::recipes::reorder_recipe_steps,
+                crate::commands::recipes::preview_recipe,
+                crate::commands::recipes::execute_recipe,
+                crate::commands::recipes::list_recipe_run_history,
                 crate::commands::timer_jobs::create_timer_job,
                 crate::commands::timer_jobs::list_timer_jobs,
                 crate::commands::timer_jobs::delete_timer_job,

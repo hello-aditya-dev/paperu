@@ -116,6 +116,7 @@ const FileRescueRoute = lazy(() => import("./FileRescueRoute").then((m) => ({ de
 const UsbToolboxRoute = lazy(() => import("./UsbToolboxRoute").then((m) => ({ default: m.UsbToolboxRoute })));
 const BackupRecipesRoute = lazy(() => import("./BackupRecipesRoute").then((m) => ({ default: m.BackupRecipesRoute })));
 const TimerJobsRoute = lazy(() => import("./TimerJobsRoute").then((m) => ({ default: m.TimerJobsRoute })));
+const RecipesRoute = lazy(() => import("./RecipesRoute").then((m) => ({ default: m.RecipesRoute })));
 // Signature Vault (lazy)
 const FormsVaultRoute = lazy(() => import("./FormsVaultRoute").then((m) => ({ default: m.FormsVaultRoute })));
 const SignatureVaultRoute = lazy(() => import("./SignatureVaultRoute").then((m) => ({ default: m.SignatureVaultRoute })));
@@ -207,6 +208,7 @@ const ROUTE_CONFIG: readonly RouteConfig[] = [
       { path: "usb" },
       { path: "backup" },
       { path: "timer" },
+      { path: "recipes" },
       { path: "watch" },
     ],
   },
@@ -317,6 +319,7 @@ export const router = createHashRouter([
       { path: "usb", element: withSuspense(<UsbToolboxRoute />) },
       { path: "backup", element: withSuspense(<BackupRecipesRoute />) },
       { path: "timer", element: withSuspense(<TimerJobsRoute />) },
+      { path: "recipes", element: withSuspense(<RecipesRoute />) },
       { path: "watch", element: withSuspense(<WatchFoldersRoute />) },
     ],
   },

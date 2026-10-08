@@ -76,10 +76,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "timer_execution",
         sql: include_str!("../../migrations/0011_timer_execution.sql"),
     },
+    Migration {
+        version: 12,
+        label: "recipes",
+        sql: include_str!("../../migrations/0012_recipes.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 11;
+pub const LATEST_VERSION: u32 = 12;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
@@ -205,5 +210,33 @@ mod tests {
         .unwrap();
         let res = run(&conn);
         assert!(res.is_err(), "must refuse a newer-than-build DB");
+    }
+
+    #[test]
+    fn migration_0012_creates_recipe_tables_idempotently() {
+        // 0012_recipes.sql creates `recipe`, `recipe_step`, and
+        // `recipe_run_history`. The migration uses CREATE TABLE IF NOT
+        // EXISTS so a second run is a no-op. P5e.
+        let conn = fresh_conn();
+        run(&conn).expect("first run applies 0012");
+        // Sanity: tables exist after the first run.
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('recipe','recipe_step','recipe_run_history')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 3, "all three 0012 tables must exist");
+        // Idempotent re-run.
+        run(&conn).expect("second run is a no-op");
+        let count_after: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('recipe','recipe_step','recipe_run_history')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_after, 3, "no duplicate tables after re-run");
     }
 }
