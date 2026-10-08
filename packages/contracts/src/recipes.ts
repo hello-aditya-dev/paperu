@@ -1,5 +1,5 @@
 /**
- * Typed Recipe Engine contracts (P5e, AUTOMATION-02).
+ * Typed Recipe Engine contracts (P5e, AUTOMATION-02; P01-2 — all ops native).
  *
  * A Recipe is an ordered list of typed, validated operations that
  * process files deterministically. NO raw shell commands — every
@@ -9,6 +9,11 @@
  * enum in `src-tauri/src/recipes/mod.rs`. Both sides must stay in
  * sync. (Named `RecipeOperationKind` here to avoid a name clash
  * with the unrelated `OperationKind` string union in `operations.ts`.)
+ *
+ * As of P01-1 / P01-2, all six operations execute natively Rust-side
+ * (image ops via the `image` crate, PDF ops via `lopdf`, watermark
+ * via `ab_glyph` + DejaVu Sans Bold). The frontend no longer has to
+ * keep the window open during a run — recipes run unattended.
  */
 
 export type RecipeOperationKind =
@@ -27,6 +32,13 @@ export type RecipeOperationKind =
 
 /** The snake_case kind tag of an operation (one of the RecipeOperationKind variants). */
 export type RecipeOperationKindTag = RecipeOperationKind["kind"];
+
+/**
+ * Coarse status of a recipe run (overall) or of a single step.
+ * Mirrors the string emitted by the Rust side
+ * (`recipes::mod::execute_recipe` / `execute_step`).
+ */
+export type RecipeRunStatus = "success" | "partial" | "failure" | "skipped";
 
 /** A persisted recipe definition. */
 export interface Recipe {
@@ -53,7 +65,12 @@ export interface PlannedOperation {
   readonly stepOrder: number;
   readonly kind: string;
   readonly summary: string;
-  /** True if this step is fully executed Rust-side in V1. */
+  /**
+   * True if this step is fully executed Rust-side. Since P01-1 this
+   * is `true` for all six operations — the field is retained for
+   * forward-compat with future engine plugs that may delegate to the
+   * webview.
+   */
   readonly rustExecutable: boolean;
 }
 
@@ -90,19 +107,31 @@ export interface UpdateRecipeRequest {
   readonly enabled?: boolean;
 }
 
-/** The result of a single step in a recipe run. */
+/**
+ * The result of a single step in a recipe run.
+ *
+ * `outputPaths` carries the absolute paths of any files produced by
+ * this step (e.g. a Resize step emits a resized image; a
+ * PlaceInOutputDir step emits the copied destination paths). The
+ * field is optional on the Rust side: when a step produces no files
+ * (e.g. VerifyOutput), or when the Rust version predates the field,
+ * the array is absent and the UI gracefully omits the open/reveal
+ * buttons.
+ */
 export interface StepResult {
   readonly stepId: string;
   readonly kind: string;
-  /** "success" | "partial" | "failure" | "skipped" */
+  /** One of RecipeRunStatus. */
   readonly status: string;
   readonly message: string;
   readonly filesProcessed: number;
+  /** Absolute output paths produced by this step (may be absent). */
+  readonly outputPaths?: readonly string[];
 }
 
 /** The overall result of a recipe run. */
 export interface RecipeRunResult {
-  /** "success" | "partial" | "failure" | "skipped" */
+  /** One of RecipeRunStatus. */
   readonly status: string;
   readonly message: string;
   readonly stepResults: readonly StepResult[];
@@ -114,9 +143,34 @@ export interface RecipeRunHistory {
   readonly recipeId: string;
   readonly startedAt: string;
   readonly finishedAt: string;
-  /** "success" | "partial" | "failure" | "skipped" */
+  /** One of RecipeRunStatus. */
   readonly status: string;
   readonly message: string | null;
+}
+
+/**
+ * A progress event emitted during a recipe run. The Rust executor
+ * calls its `on_progress` callback before each step; the Tauri
+ * command layer (added by the lead separately from P01-2) forwards
+ * these as `paperu://recipe-progress` events on the Tauri event bus.
+ *
+ * The frontend listens via `listenRecipeProgress` in `@/lib/ipc`.
+ */
+export interface RecipeProgressEvent {
+  /** The id of the running recipe. */
+  readonly recipeId: string;
+  /** The id of the run (used to correlate with the eventual result). */
+  readonly runId?: string;
+  /** 1-based index of the step about to / just executed. */
+  readonly stepIndex: number;
+  /** Total number of steps in the recipe. */
+  readonly totalSteps: number;
+  /** The snake_case kind tag of the step. */
+  readonly kind: string;
+  /** Human-readable progress message (e.g. "Step 2/3: resize (native)"). */
+  readonly message: string;
+  /** Optional coarse status when emitting post-step progress. */
+  readonly status?: RecipeRunStatus;
 }
 
 /** The Tauri command names. */
@@ -133,4 +187,19 @@ export const RecipesCommand = {
   Preview: "preview_recipe",
   Execute: "execute_recipe",
   ListRunHistory: "list_recipe_run_history",
+  /**
+   * Cancel an in-flight recipe run by its `recipeId`. The Rust side
+   * may not yet implement this command (P01-2 only owns the
+   * frontend wrapper); the lead will wire the Rust handler. The
+   * frontend calls this on a best-effort basis — if the command is
+   * unknown the call surfaces an AppError which the UI displays.
+   * One-active-run-per-recipe is the assumed invariant.
+   */
+  Cancel: "cancel_recipe_run",
 } as const;
+
+/**
+ * The Tauri event channel name for recipe-run progress events.
+ * The Rust side emits `RecipeProgressEvent` payloads on this channel.
+ */
+export const RECIPE_PROGRESS_EVENT_CHANNEL = "paperu://recipe-progress";

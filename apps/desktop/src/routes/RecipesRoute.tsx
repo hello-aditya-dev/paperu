@@ -1,5 +1,5 @@
 /**
- * Typed Recipe Engine route (P5e, AUTOMATION-02).
+ * Typed Recipe Engine route (P5e, AUTOMATION-02; P01-2 native rewrite).
  *
  * A Recipe is an ordered list of typed, validated operations. NO raw
  * shell commands — every step is a typed variant with validated
@@ -7,17 +7,21 @@
  *   - Creating / editing / deleting recipes.
  *   - Adding / reordering / deleting steps.
  *   - Previewing what a recipe will do (without executing it).
- *   - Running a recipe against a set of input files.
+ *   - Picking input files + running a recipe.
+ *   - Watching live progress events from the Rust executor.
+ *   - Cancelling an in-flight run.
+ *   - Repeating a run with the same inputs.
+ *   - Opening / revealing step outputs in the platform file manager.
  *   - Viewing the persistent run history.
  *
- * Honest V1 scope: only `PlaceInOutputDir` and `VerifyOutput` are
- * fully executed Rust-side. The image/PDF operations (`Resize`,
- * `ConvertToFormat`, `StripExif`, `Watermark`) are recorded + shown
- * in the preview but the run reports "needs frontend engine" for
- * those steps. We never pretend to do image processing we can't do.
+ * As of P01-1 / P01-2 ALL SIX operations execute natively Rust-side
+ * (image ops via the `image` crate, PDF ops via `lopdf`, watermark
+ * via `ab_glyph` + DejaVu Sans Bold). The "needs frontend" caveats
+ * are gone. Recipes run unattended — the React window does not have
+ * to stay open.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type {
   CreateTypedRecipeRequest,
@@ -25,6 +29,7 @@ import type {
   RecipeOperationKind,
   RecipeOperationKindTag,
   RecipePreview,
+  RecipeProgressEvent,
   RecipeRunHistory,
   RecipeRunResult,
   RecipeStep,
@@ -32,6 +37,7 @@ import type {
 } from "@paperu/contracts";
 import {
   addRecipeStep,
+  cancelRecipeRun,
   createRecipe,
   deleteRecipe,
   deleteRecipeStep,
@@ -39,11 +45,21 @@ import {
   listRecipeRunHistory,
   listRecipes,
   listRecipeSteps,
+  listenRecipeProgress,
+  openPath,
   previewRecipe,
   reorderRecipeSteps,
+  revealPath,
   updateRecipe,
 } from "@/lib/ipc";
 import { Button, Card } from "@paperu/ui";
+
+/** File-extension filters shared by the input picker. */
+const INPUT_FILE_FILTERS: { name: string; extensions: string[] }[] = [
+  { name: "Images", extensions: ["jpg", "jpeg", "png", "gif", "bmp", "webp", "tif", "tiff", "ico"] },
+  { name: "PDF", extensions: ["pdf"] },
+  { name: "All files", extensions: ["*"] },
+];
 
 /** Option descriptors for the operation-kind <select>. */
 const OPERATION_OPTIONS: ReadonlyArray<{
@@ -101,11 +117,11 @@ function buildOperation(
 function describeOperation(op: RecipeOperationKind): string {
   switch (op.kind) {
     case "resize":
-      return `Resize to max width ${op.params.maxWidth}px`;
+      return `Resize to max width ${op.params.maxWidth}px (Lanczos3, never upscales)`;
     case "convert_to_format":
       return `Convert to ${op.params.format}`;
     case "strip_exif":
-      return "Strip EXIF metadata";
+      return "Strip EXIF metadata (decode + re-encode)";
     case "watermark":
       return `Watermark: "${op.params.text}"`;
     case "place_in_output_dir":
@@ -115,22 +131,24 @@ function describeOperation(op: RecipeOperationKind): string {
   }
 }
 
-/** True if a step kind is fully executed Rust-side in V1. */
-function isRustExecutable(op: RecipeOperationKind): boolean {
-  return op.kind === "place_in_output_dir" || op.kind === "verify_output";
-}
-
 function statusBadge(status: string): { label: string; tone: string } {
   switch (status) {
     case "success":
-      return { label: "✓ success", tone: "var(--paperu-color-success, #2e7d32)" };
+      return { label: "✓ success", tone: "var(--paperu-success, #2e7d32)" };
     case "partial":
-      return { label: "◐ partial", tone: "var(--paperu-color-warning, #b07000)" };
+      return { label: "◐ partial", tone: "var(--paperu-warning, #b07000)" };
     case "failure":
-      return { label: "✗ failure", tone: "var(--paperu-color-danger, #c62828)" };
+      return { label: "✗ failure", tone: "var(--paperu-danger, #c62828)" };
     default:
-      return { label: "○ skipped", tone: "var(--paperu-color-muted, #777)" };
+      return { label: "○ skipped", tone: "var(--paperu-text-muted, #777)" };
   }
+}
+
+/** Just the filename component of a path (cross-platform). */
+function basename(p: string): string {
+  if (!p) return p;
+  const i = Math.max(p.lastIndexOf("/"), p.lastIndexOf("\\"));
+  return i < 0 ? p : p.slice(i + 1);
 }
 
 export function RecipesRoute(): React.ReactNode {
@@ -143,6 +161,14 @@ export function RecipesRoute(): React.ReactNode {
   const [preview, setPreview] = useState<RecipePreview | null>(null);
   const [runResult, setRunResult] = useState<RecipeRunResult | null>(null);
   const [running, setRunning] = useState(false);
+  /** Recipe currently executing on the Rust side (drives the live progress UI). */
+  const [runningRecipeId, setRunningRecipeId] = useState<string | null>(null);
+  /** Latest progress message ("Step 2/3: resize (native)"). */
+  const [progress, setProgress] = useState<string | null>(null);
+  /** True while a cancel request is in flight. */
+  const [cancelling, setCancelling] = useState(false);
+  /** Cancel request surfaced an error (e.g. command not registered). */
+  const [cancelError, setCancelError] = useState<string | null>(null);
 
   // New recipe form state.
   const [newName, setNewName] = useState("");
@@ -154,6 +180,15 @@ export function RecipesRoute(): React.ReactNode {
   const [stepFormat, setStepFormat] = useState("pdf");
   const [stepText, setStepText] = useState("");
   const [stepDir, setStepDir] = useState("");
+
+  // Input files for the next run + last-used inputs (for Repeat).
+  const [inputPaths, setInputPaths] = useState<string[]>([]);
+  const [lastInputPaths, setLastInputPaths] = useState<string[]>([]);
+
+  // Hold the unlisten function for the progress event subscription.
+  // Lives for the lifetime of the component — events are filtered
+  // by `runningRecipeId` in the handler.
+  const unlistenRef = useRef<(() => void) | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -203,6 +238,36 @@ export function RecipesRoute(): React.ReactNode {
       cancelled = true;
     };
   }, [selectedId]);
+
+  // Mount the progress-event listener for the lifetime of the
+  // component. The handler filters by `runningRecipeId` so events
+  // for other recipes (if any) are silently dropped. Outside the
+  // Tauri shell the wrapper resolves to a no-op unlisten.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const un = await listenRecipeProgress((event: RecipeProgressEvent) => {
+          if (cancelled) return;
+          if (runningRecipeId !== null && event.recipeId !== runningRecipeId) return;
+          if (event.message) setProgress(event.message);
+        });
+        if (cancelled) {
+          un();
+        } else {
+          unlistenRef.current = un;
+        }
+      } catch {
+        // Listener registration is best-effort; the run still works
+        // without live progress (executeRecipe returns the final result).
+      }
+    })();
+    return () => {
+      cancelled = true;
+      unlistenRef.current?.();
+      unlistenRef.current = null;
+    };
+  }, [runningRecipeId]);
 
   async function onCreate(): Promise<void> {
     if (!newName.trim()) {
@@ -340,27 +405,59 @@ export function RecipesRoute(): React.ReactNode {
     }
   }
 
-  async function onExecute(recipeId: string): Promise<void> {
-    setRunning(true);
-    setError(null);
-    setRunResult(null);
+  async function onPickInputFiles(): Promise<void> {
     try {
-      const picked = await open({
+      const sel = await open({
         multiple: true,
         directory: false,
         title: "Choose input files — Paperu",
+        filters: INPUT_FILE_FILTERS,
       });
-      const inputPaths = Array.isArray(picked)
-        ? picked
-        : typeof picked === "string"
-          ? [picked]
+      const picked = Array.isArray(sel)
+        ? sel
+        : typeof sel === "string"
+          ? [sel]
           : [];
-      if (inputPaths.length === 0) {
-        setError("Pick at least one input file to run the recipe.");
-        return;
+      if (picked.length > 0) {
+        setInputPaths((cur) => {
+          const seen = new Set(cur);
+          const merged = [...cur];
+          for (const p of picked) {
+            if (!seen.has(p)) {
+              seen.add(p);
+              merged.push(p);
+            }
+          }
+          return merged;
+        });
       }
-      const result = await executeRecipe(recipeId, inputPaths);
+    } catch {
+      /* dismissed */
+    }
+  }
+
+  function onRemoveInput(i: number): void {
+    setInputPaths((cur) => cur.filter((_, idx) => idx !== i));
+  }
+
+  function onClearInputs(): void {
+    setInputPaths([]);
+  }
+
+  async function onExecute(recipeId: string, paths: string[]): Promise<void> {
+    if (paths.length === 0) {
+      setError("Pick at least one input file to run the recipe.");
+      return;
+    }
+    setRunning(true);
+    setRunningRecipeId(recipeId);
+    setProgress("Starting…");
+    setRunResult(null);
+    setError(null);
+    try {
+      const result = await executeRecipe(recipeId, paths);
       setRunResult(result);
+      setLastInputPaths(paths);
       await load();
       // Refresh the preview in case steps changed (they shouldn't, but
       // this keeps the UI honest).
@@ -375,6 +472,47 @@ export function RecipesRoute(): React.ReactNode {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRunning(false);
+      setRunningRecipeId(null);
+      setProgress(null);
+      setCancelling(false);
+      setCancelError(null);
+    }
+  }
+
+  async function onCancel(recipeId: string): Promise<void> {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelRecipeRun(recipeId);
+    } catch (e) {
+      // The Rust side may not yet implement the command; surface the
+      // error next to the cancel button so the user knows it didn't
+      // take effect. The run itself continues (and will still return
+      // a result via executeRecipe).
+      setCancelError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  async function onRepeat(recipeId: string): Promise<void> {
+    if (lastInputPaths.length === 0) return;
+    await onExecute(recipeId, lastInputPaths);
+  }
+
+  async function onOpenOutput(path: string): Promise<void> {
+    try {
+      await openPath(path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function onRevealOutput(path: string): Promise<void> {
+    try {
+      await revealPath(path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -382,6 +520,7 @@ export function RecipesRoute(): React.ReactNode {
   const selectedSteps = selectedId ? (steps[selectedId] ?? []) : [];
   const selectedHistory = selectedId ? (history[selectedId] ?? []) : [];
   const currentOption = OPERATION_OPTIONS.find((o) => o.tag === stepKind);
+  const isThisRunning = running && runningRecipeId === selectedId;
 
   return (
     <section className="paperu-section" aria-labelledby="recipes-heading">
@@ -391,11 +530,13 @@ export function RecipesRoute(): React.ReactNode {
         </h1>
         <p className="paperu-text-lead">
           Ordered lists of typed, validated operations. NO raw shell
-          commands — every step is a typed variant. V1 honestly executes
-          only <code>PlaceInOutputDir</code> + <code>VerifyOutput</code>
-          Rust-side (SHA-256 verified). The image/PDF operations are
-          recorded + previewed but report "needs frontend engine" until
-          the webview side wires them up.
+          commands — every step is a typed variant. All six operations
+          execute natively Rust-side: <code>Resize</code> (Lanczos3),
+          <code>ConvertToFormat</code> (JPEG/PNG/<wbr />PDF),
+          <code>StripExif</code>, <code>Watermark</code> (DejaVu Sans),
+          <code>PlaceInOutputDir</code> (SHA-256 copy+verify, source
+          never deleted), <code>VerifyOutput</code> (SHA-256). Recipes
+          run unattended — the window does not need to stay open.
         </p>
       </header>
 
@@ -565,70 +706,57 @@ export function RecipesRoute(): React.ReactNode {
                     gap: "var(--paperu-space-1)",
                   }}
                 >
-                  {selectedSteps.map((s, i) => {
-                    const rustExec = isRustExecutable(s.operation);
-                    return (
-                      <li
-                        key={s.id}
-                        style={{
-                          border: "1px solid var(--paperu-border-subtle)",
-                          borderRadius: "var(--paperu-radius-2)",
-                          padding: "var(--paperu-space-2)",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          gap: "var(--paperu-space-2)",
-                        }}
-                      >
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div className="paperu-text-caption paperu-text-numeric">
-                            #{i + 1} · {s.operation.kind}
-                            {!rustExec && (
-                              <span
-                                style={{
-                                  marginLeft: "var(--paperu-space-2)",
-                                  color: "var(--paperu-color-warning, #b07000)",
-                                }}
-                              >
-                                needs frontend
-                              </span>
-                            )}
-                          </div>
-                          <div className="paperu-text-code paperu-break-all">
-                            {describeOperation(s.operation)}
-                          </div>
+                  {selectedSteps.map((s, i) => (
+                    <li
+                      key={s.id}
+                      style={{
+                        border: "1px solid var(--paperu-border-subtle)",
+                        borderRadius: "var(--paperu-radius-2)",
+                        padding: "var(--paperu-space-2)",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        gap: "var(--paperu-space-2)",
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div className="paperu-text-caption paperu-text-numeric">
+                          #{i + 1} · {s.operation.kind}
                         </div>
-                        <div style={{ display: "flex", gap: "var(--paperu-space-1)" }}>
-                          <button
-                            type="button"
-                            className="paperu-btn paperu-btn--ghost"
-                            onClick={() => void onMoveStep(selectedRecipe.id, selectedSteps, i, i - 1)}
-                            disabled={i === 0}
-                            aria-label="Move step up"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className="paperu-btn paperu-btn--ghost"
-                            onClick={() => void onMoveStep(selectedRecipe.id, selectedSteps, i, i + 1)}
-                            disabled={i === selectedSteps.length - 1}
-                            aria-label="Move step down"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
-                            className="paperu-btn paperu-btn--ghost"
-                            onClick={() => void onDeleteStep(selectedRecipe.id, s.id)}
-                            aria-label="Delete step"
-                          >
-                            ×
-                          </button>
+                        <div className="paperu-text-code paperu-break-all">
+                          {describeOperation(s.operation)}
                         </div>
-                      </li>
-                    );
-                  })}
+                      </div>
+                      <div style={{ display: "flex", gap: "var(--paperu-space-1)" }}>
+                        <button
+                          type="button"
+                          className="paperu-btn paperu-btn--ghost"
+                          onClick={() => void onMoveStep(selectedRecipe.id, selectedSteps, i, i - 1)}
+                          disabled={i === 0}
+                          aria-label="Move step up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="paperu-btn paperu-btn--ghost"
+                          onClick={() => void onMoveStep(selectedRecipe.id, selectedSteps, i, i + 1)}
+                          disabled={i === selectedSteps.length - 1}
+                          aria-label="Move step down"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="paperu-btn paperu-btn--ghost"
+                          onClick={() => void onDeleteStep(selectedRecipe.id, s.id)}
+                          aria-label="Delete step"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </li>
+                  ))}
                 </ol>
               )}
             </div>
@@ -750,12 +878,10 @@ export function RecipesRoute(): React.ReactNode {
                       <span>#{op.stepOrder + 1} · {op.summary}</span>
                       <span
                         style={{
-                          color: op.rustExecutable
-                            ? "var(--paperu-color-success, #2e7d32)"
-                            : "var(--paperu-color-warning, #b07000)",
+                          color: "var(--paperu-success, #2e7d32)",
                         }}
                       >
-                        {op.rustExecutable ? "rust" : "frontend"}
+                        native
                       </span>
                     </li>
                   ))}
@@ -763,7 +889,75 @@ export function RecipesRoute(): React.ReactNode {
               </details>
             )}
 
-            {/* Execute */}
+            {/* Input files picker */}
+            <div
+              style={{
+                marginTop: "var(--paperu-space-4)",
+                border: "1px dashed var(--paperu-border-subtle)",
+                borderRadius: "var(--paperu-radius-2)",
+                padding: "var(--paperu-space-3)",
+                display: "grid",
+                gap: "var(--paperu-space-2)",
+              }}
+            >
+              <span className="paperu-text-label">
+                Input files ({inputPaths.length})
+              </span>
+              <div style={{ display: "flex", gap: "var(--paperu-space-2)", flexWrap: "wrap" }}>
+                <Button variant="outline" onClick={onPickInputFiles}>
+                  + Pick input files
+                </Button>
+                {inputPaths.length > 0 && (
+                  <Button variant="ghost" onClick={onClearInputs}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {inputPaths.length > 0 && (
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: 0,
+                    display: "grid",
+                    gap: "var(--paperu-space-1)",
+                    maxHeight: "12rem",
+                    overflowY: "auto",
+                  }}
+                >
+                  {inputPaths.map((p, i) => (
+                    <li
+                      key={`${p}-${i}`}
+                      className="paperu-text-code paperu-break-all"
+                      style={{
+                        fontSize: "var(--paperu-text-xs)",
+                        display: "flex",
+                        gap: "var(--paperu-space-2)",
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0 }}>{p}</span>
+                      <button
+                        type="button"
+                        className="paperu-btn paperu-btn--ghost"
+                        onClick={() => onRemoveInput(i)}
+                        aria-label={`Remove ${basename(p)}`}
+                        style={{ padding: "0 4px" }}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {lastInputPaths.length > 0 && (
+                <p className="paperu-text-caption">
+                  Last run used {lastInputPaths.length} input file(s).
+                </p>
+              )}
+            </div>
+
+            {/* Run / Cancel / Repeat controls */}
             <div
               style={{
                 marginTop: "var(--paperu-space-4)",
@@ -775,17 +969,69 @@ export function RecipesRoute(): React.ReactNode {
             >
               <Button
                 variant="accent"
-                onClick={() => void onExecute(selectedRecipe.id)}
-                disabled={running || !selectedRecipe.enabled}
+                onClick={() => void onExecute(selectedRecipe.id, inputPaths)}
+                disabled={isThisRunning || !selectedRecipe.enabled || inputPaths.length === 0}
               >
-                {running ? "Running…" : "Run recipe…"}
+                {isThisRunning ? "Running…" : "Run recipe"}
               </Button>
+              {isThisRunning && (
+                <Button
+                  variant="outline"
+                  onClick={() => void onCancel(selectedRecipe.id)}
+                  disabled={cancelling}
+                >
+                  {cancelling ? "Cancelling…" : "Cancel run"}
+                </Button>
+              )}
+              {!isThisRunning && lastInputPaths.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => void onRepeat(selectedRecipe.id)}
+                  disabled={!selectedRecipe.enabled}
+                >
+                  Repeat last run
+                </Button>
+              )}
               {!selectedRecipe.enabled && (
-                <span className="paperu-text-caption" style={{ color: "var(--paperu-color-warning, #b07000)" }}>
+                <span className="paperu-text-caption" style={{ color: "var(--paperu-warning, #b07000)" }}>
                   Recipe is disabled — enable it to run.
                 </span>
               )}
+              {inputPaths.length === 0 && selectedRecipe.enabled && (
+                <span className="paperu-text-caption">
+                  Pick input files above to enable Run.
+                </span>
+              )}
             </div>
+
+            {/* Live progress */}
+            {isThisRunning && progress && (
+              <div
+                className="paperu-text-caption paperu-text-numeric"
+                role="status"
+                aria-live="polite"
+                style={{
+                  marginTop: "var(--paperu-space-3)",
+                  padding: "var(--paperu-space-2) var(--paperu-space-3)",
+                  borderRadius: "var(--paperu-radius-2)",
+                  background: "color-mix(in srgb, var(--paperu-accent, #2a72cc) 8%, transparent)",
+                  color: "var(--paperu-text-muted, #555)",
+                }}
+              >
+                {progress}
+              </div>
+            )}
+            {isThisRunning && cancelError && (
+              <div
+                className="paperu-text-caption paperu-break-all"
+                style={{
+                  marginTop: "var(--paperu-space-2)",
+                  color: "var(--paperu-danger, #c62828)",
+                }}
+              >
+                Cancel failed: {cancelError}. The run continues.
+              </div>
+            )}
 
             {/* Run result */}
             {runResult && (
@@ -803,13 +1049,88 @@ export function RecipesRoute(): React.ReactNode {
                 <p className="paperu-text-caption paperu-break-all" style={{ marginTop: "var(--paperu-space-1)" }}>
                   {runResult.message}
                 </p>
-                <ul style={{ listStyle: "none", padding: 0, marginTop: "var(--paperu-space-2)", display: "grid", gap: "var(--paperu-space-1)" }}>
+                <ul style={{ listStyle: "none", padding: 0, marginTop: "var(--paperu-space-2)", display: "grid", gap: "var(--paperu-space-2)" }}>
                   {runResult.stepResults.map((s, i) => {
                     const badge = statusBadge(s.status);
+                    const outputs = s.outputPaths ?? [];
                     return (
-                      <li key={s.stepId || i} className="paperu-text-caption" style={{ display: "flex", gap: "var(--paperu-space-2)" }}>
-                        <span style={{ color: badge.tone, minWidth: "5rem" }}>{badge.label}</span>
-                        <span className="paperu-break-all">{s.message}</span>
+                      <li
+                        key={s.stepId || i}
+                        style={{
+                          border: "1px solid var(--paperu-border-subtle)",
+                          borderRadius: "var(--paperu-radius-2)",
+                          padding: "var(--paperu-space-2)",
+                          display: "grid",
+                          gap: "var(--paperu-space-1)",
+                        }}
+                      >
+                        <div
+                          className="paperu-text-caption"
+                          style={{ display: "flex", gap: "var(--paperu-space-2)", alignItems: "baseline" }}
+                        >
+                          <span
+                            className="paperu-stamp"
+                            style={{
+                              color: badge.tone,
+                              borderColor: `color-mix(in srgb, ${badge.tone} 50%, transparent)`,
+                              background: `color-mix(in srgb, ${badge.tone} 8%, transparent)`,
+                            }}
+                          >
+                            {badge.label}
+                          </span>
+                          <span className="paperu-text-numeric">#{i + 1} · {s.kind}</span>
+                          <span style={{ color: "var(--paperu-text-muted, #777)" }}>
+                            {s.filesProcessed} file(s)
+                          </span>
+                        </div>
+                        <div className="paperu-text-caption paperu-break-all">
+                          {s.message}
+                        </div>
+                        {outputs.length > 0 && (
+                          <ul
+                            style={{
+                              listStyle: "none",
+                              padding: 0,
+                              margin: 0,
+                              display: "grid",
+                              gap: "var(--paperu-space-1)",
+                            }}
+                          >
+                            {outputs.map((p, j) => (
+                              <li
+                                key={`${p}-${j}`}
+                                className="paperu-text-code paperu-break-all"
+                                style={{
+                                  display: "flex",
+                                  gap: "var(--paperu-space-1)",
+                                  alignItems: "center",
+                                  flexWrap: "wrap",
+                                  fontSize: "var(--paperu-text-xs)",
+                                }}
+                              >
+                                <span style={{ flex: 1, minWidth: 0 }}>{p}</span>
+                                <button
+                                  type="button"
+                                  className="paperu-btn paperu-btn--ghost"
+                                  onClick={() => void onOpenOutput(p)}
+                                  aria-label={`Open ${basename(p)}`}
+                                  style={{ padding: "0 6px" }}
+                                >
+                                  Open
+                                </button>
+                                <button
+                                  type="button"
+                                  className="paperu-btn paperu-btn--ghost"
+                                  onClick={() => void onRevealOutput(p)}
+                                  aria-label={`Reveal ${basename(p)}`}
+                                  style={{ padding: "0 6px" }}
+                                >
+                                  Reveal
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </li>
                     );
                   })}
@@ -842,7 +1163,16 @@ export function RecipesRoute(): React.ReactNode {
                         className="paperu-text-caption paperu-text-numeric"
                         style={{ display: "flex", gap: "var(--paperu-space-2)" }}
                       >
-                        <span style={{ color: badge.tone, minWidth: "5rem" }}>{badge.label}</span>
+                        <span
+                          className="paperu-stamp"
+                          style={{
+                            color: badge.tone,
+                            borderColor: `color-mix(in srgb, ${badge.tone} 50%, transparent)`,
+                            background: `color-mix(in srgb, ${badge.tone} 8%, transparent)`,
+                          }}
+                        >
+                          {badge.label}
+                        </span>
                         <span>{new Date(h.finishedAt).toLocaleString()}</span>
                         {h.message && <span className="paperu-break-all">· {h.message}</span>}
                       </li>

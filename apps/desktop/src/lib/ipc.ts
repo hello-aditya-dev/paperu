@@ -68,6 +68,7 @@ import type {
   RecipeStep,
   UpdateRecipeRequest,
   CreateTypedRecipeRequest,
+  RecipeProgressEvent,
 } from "@paperu/contracts";
 import {
   ApplicationKitCommand,
@@ -91,6 +92,7 @@ import {
   UsbToolboxCommand,
   WatchCommand,
   RecipesCommand,
+  RECIPE_PROGRESS_EVENT_CHANNEL,
   isAppError,
   appError as buildAppError,
   ErrorCategory,
@@ -763,6 +765,58 @@ export async function executeRecipe(id: string, inputPaths: string[]): Promise<R
 }
 export async function listRecipeRunHistory(id: string, limit?: number): Promise<RecipeRunHistory[]> {
   return call<RecipeRunHistory[]>(RecipesCommand.ListRunHistory, { id, limit });
+}
+
+/**
+ * Subscribe to recipe-run progress events. Returns an unlisten
+ * function the caller MUST invoke on cleanup.
+ *
+ * Outside the Tauri desktop shell (unit tests, plain browser), the
+ * returned promise resolves to a no-op unlisten + the handler is
+ * never invoked — so React components can mount the listener
+ * unconditionally without breaking the test runner.
+ *
+ * The Rust side emits `RecipeProgressEvent` payloads on the
+ * `RECIPE_PROGRESS_EVENT_CHANNEL` channel (added by the lead
+ * separately from P01-2). Until the lead wires the Rust emission,
+ * no events arrive; the listener simply stays idle.
+ */
+export async function listenRecipeProgress(
+  handler: (event: RecipeProgressEvent) => void,
+): Promise<() => void> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+    return () => {};
+  }
+  const { listen } = await import("@tauri-apps/api/event");
+  const un = await listen<RecipeProgressEvent>(
+    RECIPE_PROGRESS_EVENT_CHANNEL,
+    (event) => {
+      const payload = event?.payload;
+      if (payload) handler(payload);
+    },
+  );
+  return un;
+}
+
+/**
+ * Cancel an in-flight recipe run. Best-effort: the Rust command
+ * (`cancel_recipe_run`) may not yet exist on the backend (P01-2 only
+ * owns the frontend wrapper). If the command is unknown or the run
+ * already finished, the call surfaces an `AppError` which the UI
+ * displays next to the Run button.
+ *
+ * Parameter is `recipeId` (not a per-run UUID) so the frontend can
+ * always issue a cancel without first waiting for a `runId` to
+ * arrive via a progress event. The Rust side may map this to its
+ * own run-id table; one-active-run-per-recipe is the assumed
+ * invariant (Paperu runs recipes on the Tauri worker thread, not
+ * concurrently).
+ *
+ * Returns `true` when the Rust side acknowledges the cancel; the
+ * actual run will then abort on its next step boundary.
+ */
+export async function cancelRecipeRun(recipeId: string): Promise<boolean> {
+  return call<boolean>(RecipesCommand.Cancel, { recipeId });
 }
 
 
