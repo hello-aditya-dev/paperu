@@ -36,6 +36,9 @@ import type {
   RecentWorkEntry,
   RescueDiagnosis,
   Settings,
+  SignatureItem,
+  AddSignatureRequest,
+  UpdateSignatureRequest,
   SettingsPatch,
   UpdateApplicationKitItemRequest,
   UpdateNoteRequest,
@@ -53,6 +56,7 @@ import {
   ReadingHistoryCommand,
   RecentWorkCommand,
   RescueCommand,
+  SignatureVaultCommand,
   WatchCommand,
   isAppError,
   appError as buildAppError,
@@ -405,6 +409,36 @@ export async function replaceApplicationKitItem(
   request: AddApplicationKitItemRequest,
 ): Promise<ApplicationKitItem> {
   return call<ApplicationKitItem>(ApplicationKitCommand.Replace, { id, request });
+}
+
+// ── Signature Vault (local-only signature file references, 90% §37) ──
+
+/** Add a new signature reference. Returns the inserted item. */
+export async function addSignatureItem(request: AddSignatureRequest): Promise<SignatureItem> {
+  return call<SignatureItem>(SignatureVaultCommand.Add, { request });
+}
+
+/** List all signature references, grouped by variant. */
+export async function listSignatureItems(): Promise<SignatureItem[]> {
+  return call<SignatureItem[]>(SignatureVaultCommand.List);
+}
+
+/** Update a signature's label/notes/sort. File ref uses replace (atomic). */
+export async function updateSignatureItem(request: UpdateSignatureRequest): Promise<SignatureItem> {
+  return call<SignatureItem>(SignatureVaultCommand.Update, { request });
+}
+
+/** Atomically replace a signature's file reference (preserves the id). */
+export async function replaceSignatureItem(
+  id: string,
+  request: AddSignatureRequest,
+): Promise<SignatureItem> {
+  return call<SignatureItem>(SignatureVaultCommand.Replace, { id, request });
+}
+
+/** Remove a single signature by id. */
+export async function removeSignatureItem(id: string): Promise<void> {
+  await call<null>(SignatureVaultCommand.Remove, { id });
 }
 
 // ── Folder Organizer (rules-based file automation) ────────────────

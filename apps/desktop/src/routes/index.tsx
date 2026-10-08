@@ -111,6 +111,8 @@ const FileRescueRoute = lazy(() => import("./FileRescueRoute").then((m) => ({ de
 const UsbToolboxRoute = lazy(() => import("./UsbToolboxRoute").then((m) => ({ default: m.UsbToolboxRoute })));
 const BackupRecipesRoute = lazy(() => import("./BackupRecipesRoute").then((m) => ({ default: m.BackupRecipesRoute })));
 const TimerJobsRoute = lazy(() => import("./TimerJobsRoute").then((m) => ({ default: m.TimerJobsRoute })));
+// Signature Vault (lazy)
+const SignatureVaultRoute = lazy(() => import("./SignatureVaultRoute").then((m) => ({ default: m.SignatureVaultRoute })));
 const WatchFoldersRoute = lazy(() => import("./WatchFoldersRoute").then((m) => ({ default: m.WatchFoldersRoute })));
 
 
@@ -169,6 +171,7 @@ export const router = createHashRouter([
       { path: "notes", element: withSuspense(<NotesRoute />) },
       { path: "print", element: withSuspense(<PrintStudioRoute />) },
       { path: "batch", element: withSuspense(<BatchStudioRoute />) },
+{ path: "signature-vault", element: withSuspense(<SignatureVaultRoute />) },
       { path: "send", element: withSuspense(<PaperuSendRoute />) },
       { path: "onboarding", element: withSuspense(<OnboardingRoute />) },
       // ── Zero→50% feature expansion routes ───────────────────

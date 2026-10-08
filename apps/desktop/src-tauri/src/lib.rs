@@ -76,6 +76,7 @@ pub mod recent_work;
 pub mod rename;
 pub mod security;
 pub mod settings;
+pub mod signature_vault;
 pub mod tasks;
 pub mod watch;
 
@@ -205,6 +206,11 @@ mod runtime {
                 crate::commands::watch::start_watch_folder,
                 crate::commands::watch::stop_watch_folder,
                 crate::commands::watch::current_watch_folder,
+                crate::commands::signature_vault::add_signature_item,
+                crate::commands::signature_vault::list_signature_items,
+                crate::commands::signature_vault::update_signature_item,
+                crate::commands::signature_vault::replace_signature_item,
+                crate::commands::signature_vault::remove_signature_item,
             ])
             .run(tauri::generate_context!())
             .expect("Paperu failed to start");

@@ -44,6 +44,8 @@ pub mod save_as;
 pub mod settings;
 pub mod shell;
 #[cfg(feature = "tauri-runtime")]
+pub mod signature_vault;
+#[cfg(feature = "tauri-runtime")]
 pub mod watch;
 
 #[cfg(feature = "tauri-runtime")]
@@ -78,6 +80,8 @@ pub use save_as::*;
 #[cfg(feature = "tauri-runtime")]
 pub use settings::*;
 pub use shell::*;
+#[cfg(feature = "tauri-runtime")]
+pub use signature_vault::*;
 #[cfg(feature = "tauri-runtime")]
 pub use watch::*;
 

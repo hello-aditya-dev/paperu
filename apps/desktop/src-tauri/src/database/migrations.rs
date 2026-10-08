@@ -56,10 +56,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "organizer_conflict_policy",
         sql: include_str!("../../migrations/0007_organizer_conflict_policy.sql"),
     },
+    Migration {
+        version: 8,
+        label: "signature_vault",
+        sql: include_str!("../../migrations/0008_signature_vault.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 7;
+pub const LATEST_VERSION: u32 = 8;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
