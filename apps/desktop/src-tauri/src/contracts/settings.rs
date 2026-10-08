@@ -48,6 +48,11 @@ pub struct Settings {
     pub update_preference: UpdatePreference,
     pub reduced_motion: bool,
     pub allow_diagnostics: bool,
+    /// P4: separate consent for product analytics (coarse event
+    /// types only — never paths, filenames, document contents).
+    /// Distinct from `allow_diagnostics` so a user can opt into crash
+    /// reporting without opting into usage analytics.
+    pub allow_product_analytics: bool,
 }
 
 impl Default for Settings {
@@ -61,6 +66,7 @@ impl Default for Settings {
             update_preference: UpdatePreference::Notify,
             reduced_motion: false,
             allow_diagnostics: false,
+            allow_product_analytics: false,
         }
     }
 }
@@ -83,6 +89,8 @@ pub struct SettingsPatch {
     pub reduced_motion: Option<bool>,
     #[serde(default)]
     pub allow_diagnostics: Option<bool>,
+    #[serde(default)]
+    pub allow_product_analytics: Option<bool>,
 }
 
 impl SettingsPatch {
@@ -108,6 +116,9 @@ impl SettingsPatch {
         }
         if let Some(v) = self.allow_diagnostics {
             target.allow_diagnostics = v;
+        }
+        if let Some(v) = self.allow_product_analytics {
+            target.allow_product_analytics = v;
         }
     }
 }

@@ -56,8 +56,18 @@ export interface Settings {
   /**
    * Whether Paperu may (in future) send opt-in diagnostics.
    * Defaults to false. Local-first: never on by default.
+   *
+   * P4: Diagnostics covers crash reports + stack traces (future). It
+   * does NOT authorise product analytics. Both must be off by default.
    */
   readonly allowDiagnostics: boolean;
+  /**
+   * Whether Paperu may collect opt-in product analytics (coarse event
+   * types only — never paths, filenames, or document contents).
+   * Defaults to false. Distinct from diagnostics so a user can opt
+   * into crash reporting without opting into usage analytics.
+   */
+  readonly allowProductAnalytics: boolean;
 }
 
 /** The explicit, versioned defaults. Source of truth for first launch. */
@@ -70,6 +80,7 @@ export const DEFAULT_SETTINGS: Settings = {
   updatePreference: UpdatePreference.Notify,
   reducedMotion: false,
   allowDiagnostics: false,
+  allowProductAnalytics: false,
 };
 
 /**

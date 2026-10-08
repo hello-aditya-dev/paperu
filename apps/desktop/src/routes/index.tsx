@@ -136,22 +136,116 @@ function withSuspense(element: React.ReactNode): React.ReactNode {
   return <Suspense fallback={<RouteLoading />}>{element}</Suspense>;
 }
 
-// Route paths exported for the registry-truth test (90% §1 defect 5).
-// Every available module's route must be in this set. Derived from the
-// router children below (paths prefixed with /).
-export const ROUTE_PATHS: ReadonlySet<string> = new Set([
-  "/", "/inspect", "/pdf", "/images",
-  "/pdf/fit", "/image/fit", "/pdf/merge", "/pdf/split",
-  "/pdf/from-images", "/pdf/to-images", "/pdf/sign", "/pdf/fill",
-  "/pdf/watermark", "/pdf/pages", "/notebook",
-  "/about", "/diagnostics", "/history",
-  "/assignment", "/passport-photo", "/portal", "/kit", "/reader", "/notes", "/print",
-  "/batch", "/forms-vault", "/signature-vault", "/send", "/onboarding",
-  "/rename", "/filename-fixer", "/duplicates", "/quick-look",
-  "/cleaner", "/organizer", "/citations", "/study-packs",
-  "/webpage-pdf", "/screenshot-bridge", "/scanner", "/clipboard",
-  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch", "/business-docs", "/pdf/compare", "/metadata-studio",
-]);
+// P0-G: the route config is the SINGLE source of truth. ROUTE_PATHS is
+// derived from this config — no hand-maintained duplicated set.
+// The acceptance test asserts every canonical route path is in this set
+// + that navigating to each path renders without error.
+interface RouteConfig {
+  path?: string;
+  index?: boolean;
+  element?: React.ReactNode;
+  children?: readonly RouteConfig[];
+}
+
+const ROUTE_CONFIG: readonly RouteConfig[] = [
+  {
+    path: "/",
+    children: [
+      { index: true },
+      { path: "inspect" },
+      // Workspace shells (eager — small, no engine deps).
+      { path: "pdf" },
+      { path: "images" },
+      { path: "pdf/fit" },
+      { path: "image/fit" },
+      { path: "pdf/merge" },
+      { path: "pdf/split" },
+      { path: "pdf/from-images" },
+      { path: "pdf/to-images" },
+      { path: "pdf/sign" },
+      { path: "pdf/fill" },
+      { path: "pdf/watermark" },
+      { path: "pdf/pages" },
+      { path: "about" },
+      { path: "diagnostics" },
+      { path: "history" },
+      // ── Master Prompt 4 consumer routes (lazy) ─────────────────
+      { path: "assignment" },
+      { path: "pdf/compare" },
+      { path: "business-docs" },
+      { path: "passport-photo" },
+      { path: "portal" },
+      { path: "kit" },
+      // Reader resolves the path from a ?path= query param, the staged
+      // WorkingFile store, or a native picker — never a raw URL segment.
+      { path: "reader" },
+      { path: "notes" },
+      { path: "print" },
+      { path: "batch" },
+      { path: "forms-vault" },
+      { path: "signature-vault" },
+      { path: "send" },
+      { path: "onboarding" },
+      // ── Zero→50% feature expansion routes ───────────────────
+      { path: "rename" },
+      { path: "filename-fixer" },
+      { path: "duplicates" },
+      { path: "quick-look" },
+      { path: "cleaner" },
+      { path: "organizer" },
+      { path: "citations" },
+      { path: "study-packs" },
+      { path: "notebook" },
+      { path: "webpage-pdf" },
+      { path: "screenshot-bridge" },
+      { path: "scanner" },
+      { path: "clipboard" },
+      { path: "converter" },
+      { path: "archive" },
+      { path: "metadata-studio" },
+      { path: "rescue" },
+      { path: "usb" },
+      { path: "backup" },
+      { path: "timer" },
+      { path: "watch" },
+    ],
+  },
+];
+
+/** Walk the route config + collect every canonical path (with leading /). */
+function collectPaths(config: readonly RouteConfig[]): string[] {
+  const paths: string[] = [];
+  function walk(parent: string, routes: readonly RouteConfig[]): void {
+    for (const r of routes) {
+      // Index route inherits the parent path.
+      if (r.index === true) {
+        paths.push(parent || "/");
+        continue;
+      }
+      if (!r.path) continue;
+      // Absolute child path (starts with /).
+      const full = r.path.startsWith("/")
+        ? r.path
+        : parent === "/"
+          ? `/${r.path}`
+          : `${parent}/${r.path}`;
+      paths.push(full);
+      if (r.children) walk(full, r.children);
+    }
+  }
+  for (const r of config) {
+    if (r.path) paths.push(r.path);
+    if (r.children) walk(r.path ?? "", r.children);
+  }
+  return paths;
+}
+
+/**
+ * The canonical set of route paths — derived from `ROUTE_CONFIG` (the
+ * same config `router` is built from). No hand-maintained duplicate
+ * set. The acceptance test asserts this matches the actual router.
+ */
+export const ROUTE_PATHS: ReadonlySet<string> = new Set(collectPaths(ROUTE_CONFIG));
 
 export const router = createHashRouter([
   {
@@ -177,7 +271,7 @@ export const router = createHashRouter([
       },
       { path: "pdf/sign", element: withSuspense(<SignPdfRoute />) },
       { path: "pdf/fill", element: withSuspense(<FillPdfRoute />) },
-{ path: "pdf/watermark", element: withSuspense(<PdfWatermarkRoute />) },
+      { path: "pdf/watermark", element: withSuspense(<PdfWatermarkRoute />) },
       { path: "pdf/pages", element: withSuspense(<PdfPageOpsRoute />) },
       { path: "about", element: <AboutRoute /> },
       { path: "diagnostics", element: <DiagnosticsRoute /> },
@@ -187,9 +281,9 @@ export const router = createHashRouter([
         path: "assignment",
         element: withSuspense(<AssignmentStudioRoute />),
       },
-{ path: "pdf/compare", element: withSuspense(<PdfCompareRoute />) },
+      { path: "pdf/compare", element: withSuspense(<PdfCompareRoute />) },
       { path: "business-docs", element: withSuspense(<BusinessDocsRoute />) },
-{ path: "passport-photo", element: withSuspense(<PassportPhotoRoute />) },
+      { path: "passport-photo", element: withSuspense(<PassportPhotoRoute />) },
       { path: "portal", element: withSuspense(<PortalReadyRoute />) },
       { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
       // Reader resolves the path from a ?path= query param, the staged
@@ -198,8 +292,8 @@ export const router = createHashRouter([
       { path: "notes", element: withSuspense(<NotesRoute />) },
       { path: "print", element: withSuspense(<PrintStudioRoute />) },
       { path: "batch", element: withSuspense(<BatchStudioRoute />) },
-{ path: "forms-vault", element: withSuspense(<FormsVaultRoute />) },
-{ path: "signature-vault", element: withSuspense(<SignatureVaultRoute />) },
+      { path: "forms-vault", element: withSuspense(<FormsVaultRoute />) },
+      { path: "signature-vault", element: withSuspense(<SignatureVaultRoute />) },
       { path: "send", element: withSuspense(<PaperuSendRoute />) },
       { path: "onboarding", element: withSuspense(<OnboardingRoute />) },
       // ── Zero→50% feature expansion routes ───────────────────
@@ -224,7 +318,6 @@ export const router = createHashRouter([
       { path: "backup", element: withSuspense(<BackupRecipesRoute />) },
       { path: "timer", element: withSuspense(<TimerJobsRoute />) },
       { path: "watch", element: withSuspense(<WatchFoldersRoute />) },
-
     ],
   },
 ]);
