@@ -203,6 +203,54 @@ fn paths_equal(a: &std::path::Path, b: &std::path::Path) -> bool {
     a_components == b_components
 }
 
+/// Loop prevention (Prompt 02 §7): check if the action's output
+/// would land inside the watched folder. Returns true if a loop
+/// would occur. Uses path-component-based containment.
+fn is_output_inside_watch(db: &Database, rule: &WatchRule) -> bool {
+    let watch_root = std::path::Path::new(&rule.folder_path);
+    match rule.action_type.as_str() {
+        "backup_recipe" => {
+            // Check the backup recipe's destination.
+            if let Ok(recipes) = crate::backup_recipes::list_recipes(db) {
+                if let Some(recipe) = recipes.into_iter().find(|r| r.id == rule.action_id) {
+                    let dest = std::path::Path::new(&recipe.destination);
+                    return is_path_contained(dest, watch_root);
+                }
+            }
+            false
+        }
+        "organizer_rule" => {
+            // Check the organizer rule's dest_folder.
+            if let Ok(rules) = crate::organizer::list_rules(db) {
+                if let Some(org_rule) = rules
+                    .into_iter()
+                    .find(|r| r.id.as_deref() == Some(&rule.action_id))
+                {
+                    let dest = std::path::Path::new(&org_rule.dest_folder);
+                    return is_path_contained(dest, watch_root);
+                }
+            }
+            false
+        }
+        "recipe" => {
+            // Check the typed recipe's PlaceInOutputDir steps' dir.
+            if let Ok(steps) = crate::recipes::list_steps(db, &rule.action_id) {
+                for step in steps {
+                    if let crate::recipes::OperationKind::PlaceInOutputDir { dir } = step.operation
+                    {
+                        let dest = std::path::Path::new(&dir);
+                        if is_path_contained(dest, watch_root) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
 /// True if the condition matches the file name.
 fn condition_matches(condition_type: &str, value: &str, file_name: &str) -> bool {
     let name_lower = file_name.to_lowercase();
@@ -235,24 +283,17 @@ fn condition_matches(condition_type: &str, value: &str, file_name: &str) -> bool
 /// doesn't expose a "run by id with this file" entry). It records as
 /// "skipped" so the user sees the rule fired but no action was taken.
 pub fn dispatch_action(db: &Database, rule: &WatchRule, file_path: &str) -> WatchDispatchResult {
-    // Self-loop prevention: the action's destination must not be inside
-    // the watched folder. We can't easily check this for all action
-    // types, but for backup_recipe we can check the recipe's destination.
-    if rule.action_type == "backup_recipe" {
-        if let Ok(recipes) = crate::backup_recipes::list_recipes(db) {
-            if let Some(recipe) = recipes.into_iter().find(|r| r.id == rule.action_id) {
-                if recipe.destination.starts_with(&rule.folder_path) {
-                    return WatchDispatchResult {
-                        rule_id: rule.id.clone(),
-                        action_type: rule.action_type.clone(),
-                        status: "skipped".to_string(),
-                        message:
-                            "destination is inside the watched folder (recursive-loop prevention)"
-                                .to_string(),
-                    };
-                }
-            }
-        }
+    // Loop prevention (Prompt 02 §7): check if the action's output
+    // would land inside the watched folder. Uses path-component-based
+    // containment (not string starts_with) to prevent false positives
+    // like /downloads matching /downloads-old.
+    if is_output_inside_watch(db, rule) {
+        return WatchDispatchResult {
+            rule_id: rule.id.clone(),
+            action_type: rule.action_type.clone(),
+            status: "skipped".to_string(),
+            message: "action output is inside the watched folder (loop prevention)".to_string(),
+        };
     }
     match rule.action_type.as_str() {
         "backup_recipe" => {
@@ -649,7 +690,7 @@ mod tests {
         .unwrap();
         let res = dispatch_action(&db, &r, "/downloads/trigger.pdf");
         assert_eq!(res.status, "skipped");
-        assert!(res.message.contains("recursive-loop"));
+        assert!(res.message.contains("loop prevention"));
     }
 
     #[test]
