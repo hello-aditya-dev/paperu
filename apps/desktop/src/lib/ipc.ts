@@ -815,8 +815,8 @@ export async function listenRecipeProgress(
  * Returns `true` when the Rust side acknowledges the cancel; the
  * actual run will then abort on its next step boundary.
  */
-export async function cancelRecipeRun(recipeId: string): Promise<boolean> {
-  return call<boolean>(RecipesCommand.Cancel, { recipeId });
+export async function cancelRecipeRun(runId: string): Promise<boolean> {
+  return call<boolean>(RecipesCommand.Cancel, { runId });
 }
 
 

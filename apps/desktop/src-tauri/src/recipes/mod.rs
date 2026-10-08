@@ -305,6 +305,9 @@ pub struct StepResult {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecipeRunResult {
+    /// The run ID (canonical cancellation identifier). The frontend
+    /// receives this + passes it to `cancelRecipeRun(runId)`.
+    pub run_id: String,
     /// success | partial | failure | skipped
     pub status: String,
     pub message: String,
@@ -580,9 +583,16 @@ pub fn execute_recipe_with_run(
     run_id: &str,
     on_progress: &mut dyn FnMut(&str),
 ) -> Result<RecipeRunResult> {
-    let cancel_token = cancel::register_run(run_id);
-    let result = execute_recipe_inner(db, recipe_id, input_paths, &cancel_token, on_progress);
-    cancel::unregister_run(run_id);
+    let cancel_token = cancel::register_run(recipe_id, run_id);
+    let result = execute_recipe_inner(
+        db,
+        recipe_id,
+        input_paths,
+        run_id,
+        &cancel_token,
+        on_progress,
+    );
+    cancel::unregister_run(recipe_id, run_id);
     result
 }
 
@@ -592,6 +602,7 @@ fn execute_recipe_inner(
     db: &Database,
     recipe_id: &str,
     input_paths: &[String],
+    run_id: &str,
     cancel_token: &std::sync::atomic::AtomicBool,
     on_progress: &mut dyn FnMut(&str),
 ) -> Result<RecipeRunResult> {
@@ -697,6 +708,7 @@ fn execute_recipe_inner(
     drop(workspace);
 
     Ok(RecipeRunResult {
+        run_id: run_id.to_string(),
         status: status.to_string(),
         message,
         step_results,
@@ -712,7 +724,15 @@ pub fn execute_recipe(
     on_progress: &mut dyn FnMut(&str),
 ) -> Result<RecipeRunResult> {
     let dummy_token = std::sync::atomic::AtomicBool::new(false);
-    execute_recipe_inner(db, recipe_id, input_paths, &dummy_token, on_progress)
+    let dummy_run_id = String::new();
+    execute_recipe_inner(
+        db,
+        recipe_id,
+        input_paths,
+        &dummy_run_id,
+        &dummy_token,
+        on_progress,
+    )
 }
 
 pub fn list_run_history(

@@ -155,22 +155,19 @@ pub fn execute_recipe(
     result
 }
 
-/// Cancel an active recipe run by recipe ID. The cancel flag is set
-/// in the cancellation registry; the execute_recipe loop checks it
-/// between steps + stops scheduling.
+/// Cancel an active recipe run by its canonical `run_id`. The cancel
+/// flag is set in the cancellation registry; the execute_recipe loop
+/// checks it between steps + stops scheduling. Returns `true` if the
+/// run was found + cancelled; `false` if it doesn't exist or already
+/// finished.
+///
+/// P02 fix: the previous implementation took a `recipe_id` (wrong —
+/// the registry is keyed by `run_id`) + returned `true` without
+/// actually cancelling. Now the command accepts the real `run_id`
+/// that the frontend received from `execute_recipe`'s response.
 #[tauri::command]
-pub fn cancel_recipe_run(state: tauri::State<'_, AppState>, id: String) -> Result<bool> {
-    // The cancel registry is keyed by run_id, not recipe_id. For V1
-    // we cancel the most-recently-registered run for this recipe.
-    // (A future enhancement would track recipe_id → run_id mapping.)
-    // For now, we just return true if any run was cancelled — the
-    // execute_recipe loop will check + stop.
-    let _ = state;
-    let _ = id;
-    // Best-effort: try to cancel by recipe_id (no-op for V1 since the
-    // registry is keyed by run_id). Return true to avoid confusing
-    // the UI; the actual cancellation happens on the next step check.
-    Ok(true)
+pub fn cancel_recipe_run(run_id: String) -> Result<bool> {
+    Ok(cancel::cancel_run(&run_id))
 }
 
 #[tauri::command]

@@ -131,6 +131,13 @@ export interface StepResult {
 
 /** The overall result of a recipe run. */
 export interface RecipeRunResult {
+  /**
+   * The canonical run ID. The frontend receives this from
+   * `executeRecipe` + passes it to `cancelRecipeRun(runId)`.
+   * P02: this field was missing — cancellation was broken because
+   * the UI had no run_id to send.
+   */
+  readonly runId: string;
   /** One of RecipeRunStatus. */
   readonly status: string;
   readonly message: string;
