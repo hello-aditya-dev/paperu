@@ -111,15 +111,14 @@ mod runtime {
             .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
                 // 90% §16-17: second launch — focus existing window + route
                 // any file argument to the Reader via the frontend.
-                let _ = app.get_webview_window("main").and_then(|w| {
+                if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
-                    Some(())
-                });
+                }
                 // If a file path was passed as an argument (Open With),
                 // emit it to the frontend for staging + navigation.
                 if let Some(path) = args.iter().find(|a| !a.starts_with('-')) {
-                    let _ = app.emit("paperu://open-file", path.to_string());
+                    let _ = app.emit("paperu://open-file", path.clone());
                 }
             }))
             .setup(|app| {
