@@ -108,7 +108,9 @@ mod tests {
 
     #[test]
     fn valid_absolute_path_passes() {
-        let result = validate_open_with_path("/tmp/paperu_open_with_test.pdf");
+        // Use the platform's temp dir so the path is absolute on any OS.
+        let tmp = std::env::temp_dir().join("paperu_open_with_test.pdf");
+        let result = validate_open_with_path(&tmp.to_string_lossy());
         assert!(result.is_ok(), "expected Ok, got {:?}", result);
         let path = result.unwrap();
         assert!(path.is_absolute() || has_windows_drive_prefix(&path.to_string_lossy()));
