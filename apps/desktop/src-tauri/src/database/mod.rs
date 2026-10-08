@@ -12,7 +12,7 @@
 pub mod migrations;
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
@@ -20,8 +20,14 @@ use crate::errors::{code, AppError, ErrorCategory, ErrorSeverity, Recoverability
 
 /// A guarded database handle. Serialized access via a Mutex because
 /// SQLite (default config) is single-writer and the app is single-user.
+///
+/// The connection is wrapped in `Arc<Mutex<...>>` so `Database` is
+/// cheaply `Clone` — the scheduler thread can hold its own handle
+/// sharing the same underlying connection. This is safe because all
+/// access goes through `with_conn` which locks the Mutex.
+#[derive(Clone)]
 pub struct Database {
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
 }
 
 impl Database {
@@ -55,7 +61,7 @@ impl Database {
         migrations::run(&conn)?;
 
         Ok(Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
         })
     }
 
@@ -64,7 +70,7 @@ impl Database {
     /// responsible for ensuring migrations have been applied.
     pub fn from_conn(conn: Connection) -> Self {
         Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
         }
     }
 

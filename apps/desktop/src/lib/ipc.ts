@@ -45,7 +45,9 @@ import type {
   BackupRunResult,
   CreateRecipeRequest,
   TimerJob,
+  TimerJobHistory,
   CreateTimerRequest,
+  UpdateTimerRequest,
   AnalyticsEvent,
   CopyVerifyResult,
   CopyVerifyRequest,
@@ -711,7 +713,7 @@ export async function runBackupRecipe(id: string): Promise<BackupRunResult> {
 }
 
 
-// ── Timer Jobs (90% §59, AUTOMATION-04) ───────────────────────────
+// ── Timer Jobs (90% §59, AUTOMATION-04, P0-02) ──────────────────
 export async function createTimerJob(request: CreateTimerRequest): Promise<TimerJob> {
   return call<TimerJob>(TimerJobsCommand.Create, { request });
 }
@@ -723,6 +725,15 @@ export async function deleteTimerJob(id: string): Promise<void> {
 }
 export async function toggleTimerJob(id: string, enabled: boolean): Promise<TimerJob> {
   return call<TimerJob>(TimerJobsCommand.Toggle, { id, enabled });
+}
+export async function updateTimerJob(request: UpdateTimerRequest): Promise<TimerJob> {
+  return call<TimerJob>(TimerJobsCommand.Update, { request });
+}
+export async function getTimerJobHistory(id: string, limit?: number): Promise<TimerJobHistory[]> {
+  return call<TimerJobHistory[]>(TimerJobsCommand.GetHistory, { id, limit });
+}
+export async function triggerTimerJobNow(id: string): Promise<TimerJob> {
+  return call<TimerJob>(TimerJobsCommand.TriggerNow, { id });
 }
 
 // ── Analytics (90% §67, COMMERCIAL-04) ────────────────────────────

@@ -148,13 +148,24 @@ mod runtime {
                 }
 
                 let state = AppState {
-                    db,
+                    db: db.clone(),
                     tasks: crate::tasks::TaskRegistry::new(),
                     app_data_dir,
                 };
                 app.manage(state);
                 // Watch Folders state (notify-debouncer watcher).
                 app.manage(crate::commands::watch::WatchState::default());
+
+                // P0-02: start the Timer Jobs scheduler. Runs in a
+                // background thread, ticks every 30s, dispatches due
+                // backup/organizer actions independent of whether the
+                // /timer route is open.
+                let scheduler = crate::timer_jobs::Scheduler::production(db.clone());
+                let _sched_handle = scheduler.spawn();
+                // Run one immediate tick on startup so missed runs
+                // (Paperu was closed during the scheduled time) are
+                // dispatched on the next launch.
+                let _ = crate::timer_jobs::Scheduler::production(db.clone()).tick();
 
                 tracing::info!(version = env!("CARGO_PKG_VERSION"), "Paperu started");
                 Ok(())
@@ -250,6 +261,9 @@ mod runtime {
                 crate::commands::timer_jobs::list_timer_jobs,
                 crate::commands::timer_jobs::delete_timer_job,
                 crate::commands::timer_jobs::toggle_timer_job,
+                crate::commands::timer_jobs::update_timer_job,
+                crate::commands::timer_jobs::get_timer_job_history,
+                crate::commands::timer_jobs::trigger_timer_job_now,
                 crate::commands::analytics::log_analytics_event,
                 crate::commands::analytics::list_analytics_events,
                 crate::commands::analytics::clear_analytics_events,

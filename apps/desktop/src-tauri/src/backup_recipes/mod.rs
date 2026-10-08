@@ -67,6 +67,23 @@ pub fn list_recipes(db: &Database) -> Result<Vec<BackupRecipe>> {
     })
 }
 
+/// True if a backup recipe with the given ID exists. Used by the
+/// Timer Jobs scheduler to detect stale jobs (recipe deleted) and
+/// mark the dispatch as `skipped` rather than `failure`.
+pub fn recipe_exists(db: &Database, id: &str) -> bool {
+    db.with_conn(|conn| {
+        let n: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM backup_recipe WHERE id = ?1",
+                rusqlite::params![id],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
+        Ok(n > 0)
+    })
+    .unwrap_or(false)
+}
+
 pub fn delete_recipe(db: &Database, id: &str) -> Result<()> {
     db.with_conn(|conn| {
         conn.execute("DELETE FROM backup_recipe WHERE id = ?1", params![id])

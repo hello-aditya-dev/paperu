@@ -71,10 +71,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "analytics",
         sql: include_str!("../../migrations/0010_analytics.sql"),
     },
+    Migration {
+        version: 11,
+        label: "timer_execution",
+        sql: include_str!("../../migrations/0011_timer_execution.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 10;
+pub const LATEST_VERSION: u32 = 11;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
