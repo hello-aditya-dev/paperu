@@ -69,6 +69,8 @@ import type {
   UpdateRecipeRequest,
   CreateTypedRecipeRequest,
   RecipeProgressEvent,
+  WatchRule,
+  CreateWatchRuleRequest,
 } from "@paperu/contracts";
 import {
   ApplicationKitCommand,
@@ -91,6 +93,7 @@ import {
   AnalyticsCommand,
   UsbToolboxCommand,
   WatchCommand,
+  WatchRulesCommand,
   RecipesCommand,
   RECIPE_PROGRESS_EVENT_CHANNEL,
   isAppError,
@@ -651,6 +654,50 @@ export async function stopWatchFolder(): Promise<void> {
 /** Returns the currently-watched path (null if none). */
 export async function currentWatchFolder(): Promise<string | null> {
   return call<string | null>(WatchCommand.Current);
+}
+
+// ── Watch Rules (P02-UI-Watch, AUTO-03) ──────────────────────────
+//  CRUD wrappers for `watch_folder` rows. The Rust side
+//  (`watch_rules::create_rule/list_rules/delete_rule/toggle_rule`)
+//  is gated behind `tauri-runtime`; outside the Tauri shell the
+//  call surfaces a structured AppError. Watch rules wire
+//  filesystem events to non-destructive actions (backup_recipe /
+//  recipe / organizer_rule). Paperu takes no destructive action.
+
+/**
+ * Create a new watch rule. Returns the persisted rule with its
+ * server-assigned id + timestamps. The Rust side rejects unknown
+ * condition / action types + empty folder_path / action_id with
+ * AppError(InvalidInput | EmptyInput).
+ */
+export async function createWatchRule(
+  request: CreateWatchRuleRequest,
+): Promise<WatchRule> {
+  return call<WatchRule>(WatchRulesCommand.Create, { request });
+}
+
+/** List all watch rules, most-recently-created first. */
+export async function listWatchRules(): Promise<WatchRule[]> {
+  return call<WatchRule[]>(WatchRulesCommand.List);
+}
+
+/** Delete a watch rule by id. Idempotent — a missing id is a no-op. */
+export async function deleteWatchRule(id: string): Promise<void> {
+  await call<null>(WatchRulesCommand.Delete, { id });
+}
+
+/**
+ * Toggle a watch rule's `enabled` flag. Returns the updated rule
+ * (the Rust side re-reads the row so the response carries the
+ * authoritative state). Used by the UI both for the master switch
+ * and as the "retry" affordance for a failed rule (off → on re-arms
+ * the rule so the next matching event re-dispatches).
+ */
+export async function toggleWatchRule(
+  id: string,
+  enabled: boolean,
+): Promise<WatchRule> {
+  return call<WatchRule>(WatchRulesCommand.Toggle, { id, enabled });
 }
 
 // NOTE: `base64ToBytes` already exists above (near readFileBytes) —
