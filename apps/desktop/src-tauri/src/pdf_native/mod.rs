@@ -636,4 +636,63 @@ mod tests {
         // An empty byte slice isn't a valid PDF → load_doc fails → page_count=0.
         assert!(reverse_pages(&[]).is_err());
     }
+
+    /// 90% §1D: reorder must genuinely change the visual page order (the
+    /// Kids array of the Pages root), not just pass save_to(). Build a
+    /// 3-page PDF with distinct page object IDs, reorder to [3, 1, 2], and
+    /// verify the Kids array reflects the new order + the document re-loads
+    /// validly (page count preserved, structure sound).
+    #[test]
+    fn reorder_genuinely_changes_visual_page_order() {
+        let bytes = build_test_pdf(3);
+        // Capture the original page object IDs in order (1, 2, 3).
+        let original_doc = Document::load_mem(&bytes).unwrap();
+        let original_pages = original_doc.get_pages(); // BTreeMap<u32, ObjectId>
+        let original_ids: Vec<ObjectId> =
+            (1..=3).map(|n| *original_pages.get(&n).unwrap()).collect();
+        // Reorder to [3, 1, 2].
+        let reordered = reorder_pages(&bytes, &[3, 1, 2]).unwrap();
+        // Re-load — must succeed (valid document structure).
+        let new_doc = Document::load_mem(&reordered).unwrap();
+        assert_eq!(new_doc.get_pages().len(), 3, "page count preserved");
+        // Read the Kids array from the Pages root + verify the order.
+        let root_id = new_doc
+            .trailer
+            .get(b"Root")
+            .and_then(|o| o.as_reference())
+            .unwrap();
+        let catalog = new_doc.get_object(root_id).unwrap().as_dict().unwrap();
+        let pages_id = catalog
+            .get(b"Pages")
+            .and_then(|o| o.as_reference())
+            .unwrap();
+        let pages_dict = new_doc.get_object(pages_id).unwrap().as_dict().unwrap();
+        let kids = pages_dict.get(b"Kids").unwrap().as_array().unwrap();
+        // The Kids array must be [page3_id, page1_id, page2_id] — the visual
+        // order genuinely changed.
+        assert_eq!(kids.len(), 3, "Kids array has 3 entries");
+        assert_eq!(
+            kids[0].as_reference().unwrap(),
+            original_ids[2],
+            "first kid is original page 3"
+        );
+        assert_eq!(
+            kids[1].as_reference().unwrap(),
+            original_ids[0],
+            "second kid is original page 1"
+        );
+        assert_eq!(
+            kids[2].as_reference().unwrap(),
+            original_ids[1],
+            "third kid is original page 2"
+        );
+    }
+
+    /// 90% §1D: a single-page PDF reorders to itself (identity permutation).
+    #[test]
+    fn reorder_single_page_is_identity() {
+        let bytes = build_test_pdf(1);
+        let out = reorder_pages(&bytes, &[1]).unwrap();
+        assert_eq!(page_count(&out), 1);
+    }
 }

@@ -313,15 +313,28 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
         }
         match std::fs::File::create(&out_path) {
             Ok(mut out_file) => {
-                if let Err(e) = std::io::copy(&mut entry, &mut out_file) {
-                    // Partial-output cleanup: remove the truncated file so the
-                    // user never gets a corrupt partial output.
-                    let _ = std::fs::remove_file(&out_path);
-                    skipped.push(format!(
-                        "{name} (write failed: {e} — partial output cleaned up)"
-                    ));
-                } else {
-                    extracted.push(name);
+                // 90% §1C: bounded copy — enforce the ACTUAL streamed bytes,
+                // not only the header-declared length. A malicious archive
+                // can lie about entry.size() (declare small, stream huge).
+                match bounded_copy(&mut entry, &mut out_file, MAX_SINGLE_ENTRY_UNCOMPRESSED) {
+                    Ok(written) => {
+                        if written > MAX_SINGLE_ENTRY_UNCOMPRESSED {
+                            let _ = std::fs::remove_file(&out_path);
+                            skipped.push(format!(
+                                "{name} (streamed {written} bytes > {} — decompression-bomb guard)",
+                                MAX_SINGLE_ENTRY_UNCOMPRESSED
+                            ));
+                        } else {
+                            extracted.push(name);
+                        }
+                    }
+                    Err(e) => {
+                        // Partial-output cleanup: remove the truncated file.
+                        let _ = std::fs::remove_file(&out_path);
+                        skipped.push(format!(
+                            "{name} (write failed: {e} — partial output cleaned up)"
+                        ));
+                    }
                 }
             }
             Err(e) => {
@@ -334,6 +347,37 @@ pub fn extract_archive(path: &str, dest: &str) -> Result<ExtractResult> {
         skipped,
         warnings,
     })
+}
+
+/// Bounded copy (90% §1C): copy from `reader` to `writer`, but abort if the
+/// total streamed bytes exceed `max_bytes`. Returns the actual bytes written.
+/// This enforces the REAL streamed length, not the archive-header-declared
+/// size (a malicious archive can lie about entry.size() — declare small,
+/// stream huge — to bypass a header-only ceiling).
+fn bounded_copy<R: std::io::Read, W: std::io::Write>(
+    reader: &mut R,
+    writer: &mut W,
+    max_bytes: u64,
+) -> std::io::Result<u64> {
+    let mut buf = vec![0u8; 65536].into_boxed_slice();
+    let mut written: u64 = 0;
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        written += n as u64;
+        if written > max_bytes {
+            // Abort: the source streamed more than the ceiling. The caller
+            // deletes the partial output.
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("streamed {written} bytes exceeds ceiling {max_bytes}"),
+            ));
+        }
+        writer.write_all(&buf[..n])?;
+    }
+    Ok(written)
 }
 
 /// Create a ZIP archive from a list of files. Each source file is read
@@ -395,6 +439,7 @@ pub fn create_archive(archive_path: &str, files: &[String]) -> Result<CreateResu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     fn rejects_traversal() {
@@ -521,5 +566,70 @@ mod tests {
         // The pre-existing content must be untouched.
         assert_eq!(std::fs::read(dest.join("a.txt")).unwrap(), b"PRE-EXISTING");
         std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// 90% §1C: build a REAL adversarial ZIP with a `../` traversal entry
+    /// name + verify extract_archive rejects it (never writes outside dest).
+    #[test]
+    fn extract_rejects_real_zip_slip_traversal_entry() {
+        let tmp = std::env::temp_dir().join(format!("paperu-slip-real-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let archive_path = tmp.join("malicious.zip");
+        // Build a ZIP with a traversal entry name using ZipWriter directly.
+        {
+            let file = std::fs::File::create(&archive_path).unwrap();
+            let mut writer = zip::ZipWriter::new(file);
+            let options = zip::write::FullFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            // A traversal entry — the validator MUST reject this.
+            writer.start_file("../evil.txt", options).unwrap();
+            writer.write_all(b"pwned").unwrap();
+            // A safe entry too, to prove the rest still extracts.
+            let safe_options = zip::write::FullFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            writer.start_file("safe.txt", safe_options).unwrap();
+            writer.write_all(b"safe").unwrap();
+            writer.finish().unwrap();
+        }
+        let dest = tmp.join("dest");
+        std::fs::create_dir_all(&dest).unwrap();
+        let extract =
+            extract_archive(archive_path.to_str().unwrap(), dest.to_str().unwrap()).unwrap();
+        // The traversal entry is skipped (rejected), NOT extracted.
+        assert!(
+            extract
+                .skipped
+                .iter()
+                .any(|s| s.contains("ZIP Slip") || s.contains("unsafe entry name")),
+            "traversal entry must be rejected: {:?}",
+            extract.skipped
+        );
+        // The safe entry extracts.
+        assert!(
+            extract.extracted.iter().any(|s| s == "safe.txt"),
+            "safe entry extracts"
+        );
+        // CRITICAL: no file was written OUTSIDE the dest dir (no ../evil.txt).
+        assert!(
+            !tmp.join("evil.txt").exists(),
+            "traversal must NOT write outside dest"
+        );
+        assert_eq!(std::fs::read(dest.join("safe.txt")).unwrap(), b"safe");
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    /// 90% §1C: a ZIP declaring a small entry.size() but streaming a huge
+    /// payload is caught by the bounded-copy streamed-byte ceiling.
+    #[test]
+    fn bounded_copy_aborts_when_streamed_bytes_exceed_limit() {
+        let big = vec![0xABu8; 200];
+        let mut reader = std::io::Cursor::new(&big[..]);
+        let mut writer = std::io::Cursor::new(Vec::new());
+        // Limit 100 bytes — the 200-byte stream must abort.
+        let result = bounded_copy(&mut reader, &mut writer, 100);
+        assert!(
+            result.is_err(),
+            "bounded_copy must abort when streamed > limit"
+        );
     }
 }

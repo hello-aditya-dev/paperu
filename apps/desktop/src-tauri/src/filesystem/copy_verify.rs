@@ -144,27 +144,55 @@ pub fn copy_and_verify(
         }
         source_hash = hasher.finalize();
         bytes_copied = copied;
+        // 90% §1B: flush + close the temp file BEFORE hashing it. If the OS
+        // still has buffered writes, the hash would be wrong (verify-then-
+        // close is a real bug). drop(dst) flushes + closes.
+        dst.flush().map_err(|e| {
+            let _ = std::fs::remove_file(&temp_path);
+            AppError::builder(
+                code::IO_FAILURE,
+                ErrorCategory::Filesystem,
+                "Paperu couldn't flush the temporary copy.",
+            )
+            .technical(e.to_string())
+            .build()
+        })?;
+    } // dst dropped here → flushed + closed.
+      // 90% §1B: hash the TEMP file (NOT the final dest) + compare BEFORE the
+      // rename. Only finalize (rename) after verification succeeds. Never
+      // return success with verified: false.
+    let dest_hash = hash_file(&temp_path)?;
+    if source_hash.as_slice() != dest_hash.as_slice() {
+        let _ = std::fs::remove_file(&temp_path);
+        return Err(AppError::builder(
+            code::PROCESSING_FAILED,
+            ErrorCategory::Processing,
+            "SHA-256 mismatch — the copied bytes don't match the source. The temp output was deleted; nothing was finalized.",
+        )
+        .technical(format!(
+            "source={} dest={}",
+            hex(&source_hash),
+            hex(&dest_hash)
+        ))
+        .build());
     }
-    // Atomic-ish rename: temp → final_dest.
+    // Verified — finalize the atomic rename.
     std::fs::rename(&temp_path, &final_dest).map_err(|e| {
         let _ = std::fs::remove_file(&temp_path);
         AppError::builder(
             code::IO_FAILURE,
             ErrorCategory::Filesystem,
-            "Paperu couldn't finalize the copy.",
+            "Paperu couldn't finalize the copy (rename temp → dest).",
         )
         .technical(e.to_string())
         .build()
     })?;
-    // Verify: hash the destination + compare.
-    let dest_hash = hash_file(&final_dest)?;
-    let verified = source_hash.as_slice() == dest_hash.as_slice();
     Ok(CopyVerifyResult {
         destination: final_dest.to_string_lossy().to_string(),
         source_hash: hex(&source_hash),
         dest_hash: hex(&dest_hash),
         bytes_copied,
-        verified,
+        verified: true,
     })
 }
 
