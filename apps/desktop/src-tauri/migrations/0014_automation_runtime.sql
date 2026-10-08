@@ -11,6 +11,11 @@ ALTER TABLE watch_folder ADD COLUMN last_status TEXT;
 ALTER TABLE watch_folder ADD COLUMN name TEXT;
 ALTER TABLE watch_folder ADD COLUMN updated_at TEXT;
 
+-- Extend timer_job with explicit input_paths for Recipe dispatch.
+-- P02 §10.2: scheduled Recipes must have explicit source files.
+-- Stored as a JSON array of absolute paths.
+ALTER TABLE timer_job ADD COLUMN input_paths TEXT; -- JSON array, nullable for non-recipe actions
+
 -- Watch execution history: one row per dispatch.
 CREATE TABLE IF NOT EXISTS watch_execution_history (
     id              TEXT PRIMARY KEY,

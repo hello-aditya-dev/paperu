@@ -185,15 +185,16 @@ impl Scheduler {
                         message: "typed recipe no longer exists".to_string(),
                     };
                 }
-                // Execute with empty input — the recipe's own steps
-                // (PlaceInOutputDir etc.) determine what files are
-                // processed. For recipes that need input files, the
-                // user configures PlaceInOutputDir with explicit paths.
+                // Execute with the timer's configured input_paths
+                // (P02 §10.2). If no input_paths are configured, use
+                // empty — the recipe's own PlaceInOutputDir steps
+                // may have their own paths.
+                let input_paths: Vec<String> = job.input_paths.clone().unwrap_or_default();
                 let mut progress_calls: Vec<String> = Vec::new();
                 let result = crate::recipes::execute_recipe(
                     &self.db,
                     &job.action_id,
-                    &[],
+                    &input_paths,
                     &mut |msg: &str| {
                         progress_calls.push(msg.to_string());
                     },

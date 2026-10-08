@@ -56,6 +56,9 @@ pub struct TimerJob {
     pub last_run: Option<String>,
     pub last_error: Option<String>,
     pub next_run: Option<String>,
+    /// P02 §10.2: explicit input paths for Recipe dispatch. JSON array
+    /// of absolute paths. Nullable for non-recipe actions.
+    pub input_paths: Option<Vec<String>>,
     pub created_at: String,
 }
 
@@ -69,6 +72,7 @@ pub struct CreateTimerRequest {
     pub action_id: String,
     pub timezone: Option<String>,
     pub enabled: Option<bool>,
+    pub input_paths: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -138,9 +142,9 @@ pub fn create_timer(db: &Database, req: CreateTimerRequest) -> Result<TimerJob> 
         )
         .map(|dt| dt.to_rfc3339());
         conn.execute(
-            "INSERT INTO timer_job (id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, ?9, ?10)",
-            params![id, req.name, req.schedule_kind, req.schedule_expr, req.action_type, req.action_id, enabled_int, timezone, next, now],
+            "INSERT INTO timer_job (id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, input_paths, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, NULL, NULL, ?9, ?10, ?11)",
+            params![id, req.name, req.schedule_kind, req.schedule_expr, req.action_type, req.action_id, enabled_int, timezone, next, req.input_paths.as_ref().map(|p| serde_json::to_string(p).unwrap_or_default()), now],
         ).map_err(map_sqlite)?;
         read_row(conn, &id)
     })
@@ -181,7 +185,7 @@ pub fn update_timer(db: &Database, req: UpdateTimerRequest) -> Result<TimerJob> 
 
 pub fn list_timers(db: &Database) -> Result<Vec<TimerJob>> {
     db.with_conn(|conn| {
-        let mut stmt = conn.prepare("SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, created_at FROM timer_job ORDER BY name").map_err(map_sqlite)?;
+        let mut stmt = conn.prepare("SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, input_paths, created_at FROM timer_job ORDER BY name").map_err(map_sqlite)?;
         let rows = stmt.query_map([], row_to_job).map_err(map_sqlite)?;
         let mut out = Vec::new();
         for r in rows { out.push(r.map_err(map_sqlite)?); }
@@ -246,7 +250,7 @@ pub fn find_due_jobs(db: &Database, now: DateTime<Utc>) -> Result<Vec<TimerJob>>
     let now_iso = now.to_rfc3339();
     db.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, created_at FROM timer_job WHERE enabled = 1 AND next_run IS NOT NULL AND next_run <= ?1 ORDER BY next_run ASC",
+            "SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, input_paths, created_at FROM timer_job WHERE enabled = 1 AND next_run IS NOT NULL AND next_run <= ?1 ORDER BY next_run ASC",
         )
         .map_err(map_sqlite)?;
         let rows = stmt.query_map(params![now_iso], row_to_job).map_err(map_sqlite)?;
@@ -525,13 +529,15 @@ fn parse_weekly(s: &str) -> std::result::Result<(Weekday, u32, u32), ()> {
 
 fn read_row(conn: &rusqlite::Connection, id: &str) -> Result<TimerJob> {
     conn.query_row(
-        "SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, created_at FROM timer_job WHERE id = ?1",
+        "SELECT id, name, schedule_kind, schedule_expr, action_type, action_id, enabled, timezone, last_run, last_error, next_run, input_paths, created_at FROM timer_job WHERE id = ?1",
         params![id], row_to_job,
     ).map_err(|e| map_sqlite_not_found(e, id))
 }
 
 fn row_to_job(row: &rusqlite::Row) -> rusqlite::Result<TimerJob> {
     let enabled_int: i64 = row.get(6)?;
+    let input_paths_json: Option<String> = row.get(11).ok();
+    let input_paths = input_paths_json.and_then(|j| serde_json::from_str(&j).ok());
     Ok(TimerJob {
         id: row.get(0)?,
         name: row.get(1)?,
@@ -544,7 +550,8 @@ fn row_to_job(row: &rusqlite::Row) -> rusqlite::Result<TimerJob> {
         last_run: row.get(8)?,
         last_error: row.get(9)?,
         next_run: row.get(10)?,
-        created_at: row.get(11)?,
+        input_paths,
+        created_at: row.get(12)?,
     })
 }
 
@@ -600,6 +607,7 @@ mod tests {
                 action_id: "recipe-123".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -623,6 +631,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -644,6 +653,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         );
         assert!(res.is_err(), "hourly is rejected");
@@ -662,6 +672,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         );
         assert!(res.is_err(), "25:00 is invalid");
@@ -680,6 +691,7 @@ mod tests {
                 action_id: "rm -rf /".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         );
         assert!(res.is_err(), "shell_command action is rejected");
@@ -748,6 +760,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -771,6 +784,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -814,6 +828,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -864,6 +879,7 @@ mod tests {
                 action_id: "r1".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -888,6 +904,7 @@ mod tests {
                 action_id: "r2".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -937,6 +954,7 @@ mod tests {
                 action_id: recipe.id.clone(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
@@ -997,6 +1015,7 @@ mod tests {
                 action_id: "nonexistent-recipe".to_string(),
                 timezone: None,
                 enabled: Some(true),
+                input_paths: None,
             },
         )
         .unwrap();
