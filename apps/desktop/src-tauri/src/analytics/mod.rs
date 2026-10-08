@@ -32,7 +32,7 @@ pub fn log_event(db: &Database, event_type: &str, detail: Option<&str>) -> Resul
 
 pub fn list_events(db: &Database, limit: i64) -> Result<Vec<AnalyticsEvent>> {
     db.with_conn(|conn| {
-        let mut stmt = conn.prepare("SELECT id, event_type, timestamp, detail FROM analytics_event ORDER BY timestamp DESC LIMIT ?1").map_err(map_sqlite)?;
+        let mut stmt = conn.prepare("SELECT id, event_type, timestamp, detail FROM analytics_event ORDER BY rowid DESC LIMIT ?1").map_err(map_sqlite)?;
         let rows = stmt.query_map(params![limit], |r| Ok(AnalyticsEvent {
             id: r.get(0)?, event_type: r.get(1)?, timestamp: r.get(2)?, detail: r.get(3)?,
         })).map_err(map_sqlite)?;
