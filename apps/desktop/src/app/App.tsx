@@ -25,6 +25,7 @@ import { CommandCenter } from "@/components/CommandCenter";
 import { Shelf } from "@/components/shelf/Shelf";
 import { formatShortcut } from "@/lib/platform";
 import { getNavModules, type ModuleEntry } from "@/lib/module-registry";
+import { initOpenWithListener } from "@/lib/open-with";
 
 export function App(): React.ReactNode {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -67,6 +68,15 @@ export function App(): React.ReactNode {
 
   // Build the nav rail once from the registry.
   const NAV_ITEMS: readonly ModuleEntry[] = getNavModules();
+
+  // ── Open With listener (P0-E) ───────────────────────────────────
+  // Pops any queued initial-launch path from Rust + listens for live
+  // `paperu://open-file` events from subsequent launches. Stages the
+  // file as a WorkingFile + navigates to the right route. The listener
+  // is a no-op outside Tauri (tests, plain browser).
+  useEffect(() => {
+    return initOpenWithListener(navigate);
+  }, [navigate]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────
   // - Ctrl/⌘ + K: open Command Center (global, even inside inputs)

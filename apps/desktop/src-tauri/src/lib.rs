@@ -109,16 +109,32 @@ mod runtime {
             .plugin(tauri_plugin_dialog::init())
             .plugin(tauri_plugin_window_state::Builder::default().build())
             .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-                // 90% §16-17: second launch — focus existing window + route
-                // any file argument to the Reader via the frontend.
+                // 90% §16-17 + P0-E: second launch — focus existing
+                // window + validate + emit any file argument for the
+                // frontend to stage + navigate.
                 if let Some(w) = app.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
                 }
                 // If a file path was passed as an argument (Open With),
-                // emit it to the frontend for staging + navigation.
+                // validate it server-side (defence in depth — the OS
+                // shell hands us arbitrary strings) and only emit when
+                // it passes. Invalid paths are logged + dropped (no
+                // crash, no surface to the user as a broken event).
                 if let Some(path) = args.iter().find(|a| !a.starts_with('-')) {
-                    let _ = app.emit("paperu://open-file", path.clone());
+                    match crate::commands::open_with::validate_open_with_path(path) {
+                        Ok(validated) => {
+                            let payload = validated.to_string_lossy().into_owned();
+                            let _ = app.emit("paperu://open-file", payload);
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                error = %err,
+                                raw = %path,
+                                "open-with: rejected second-instance arg"
+                            );
+                        }
+                    }
                 }
             }))
             .setup(|app| {
@@ -151,8 +167,38 @@ mod runtime {
                     db: db.clone(),
                     tasks: crate::tasks::TaskRegistry::new(),
                     app_data_dir,
+                    open_with_queue: std::sync::Mutex::new(Vec::new()),
                 };
                 app.manage(state);
+
+                // P0-E: parse the initial-launch CLI args for an Open
+                // With file path. The first non-flag argument is treated
+                // as a candidate file path. If it validates, push it to
+                // the queue; the frontend pops it via the
+                // `consume_open_with_event` command on its first ready
+                // tick. Invalid paths are logged + dropped (no crash).
+                //
+                // Second-instance args are handled by the
+                // `tauri-plugin-single-instance` callback above, which
+                // emits `paperu://open-file` directly.
+                if let Some(raw_arg) = std::env::args().skip(1).find(|a| !a.starts_with('-')) {
+                    match crate::commands::open_with::validate_open_with_path(&raw_arg) {
+                        Ok(validated) => {
+                            let payload = validated.to_string_lossy().into_owned();
+                            let state = app.state::<AppState>();
+                            if let Ok(mut q) = state.open_with_queue.lock() {
+                                q.push(payload);
+                            }
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                error = %err,
+                                raw = %raw_arg,
+                                "open-with: rejected startup arg"
+                            );
+                        }
+                    }
+                }
                 // Watch Folders state (notify-debouncer watcher).
                 app.manage(crate::commands::watch::WatchState::default());
 
@@ -171,6 +217,7 @@ mod runtime {
                 Ok(())
             })
             .invoke_handler(tauri::generate_handler![
+                crate::commands::open_with::consume_open_with_event,
                 crate::commands::inspect::inspect_file,
                 crate::commands::finalize::finalize_output,
                 crate::commands::read_file::read_file_bytes,

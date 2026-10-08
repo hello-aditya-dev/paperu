@@ -33,6 +33,7 @@ pub mod forms_vault;
 pub mod inspect;
 #[cfg(feature = "tauri-runtime")]
 pub mod notes;
+pub mod open_with;
 #[cfg(feature = "tauri-runtime")]
 pub mod organizer;
 pub mod pdf_info;
@@ -82,6 +83,7 @@ pub use forms_vault::*;
 pub use inspect::*;
 #[cfg(feature = "tauri-runtime")]
 pub use notes::*;
+pub use open_with::*;
 #[cfg(feature = "tauri-runtime")]
 pub use organizer::*;
 pub use pdf_info::*;
