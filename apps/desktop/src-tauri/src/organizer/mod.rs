@@ -229,6 +229,139 @@ pub fn execute(rule: &OrganizerRule) -> Result<ExecuteResult> {
     Ok(ExecuteResult { succeeded, failed })
 }
 
+/// Execute an organizer rule on a SINGLE triggering file (Prompt 02 §6.3).
+/// Used by the Watch Folders dispatcher: when a new file appears,
+/// only that file is processed — not all files in the source folder.
+///
+/// Requirements:
+/// - Only process `source_path`.
+/// - Confirm it belongs to the rule's source root.
+/// - Confirm it matches the rule's condition.
+/// - Confirm it is a regular file.
+/// - Validate the destination.
+/// - Apply the configured collision policy.
+/// - Preserve unrelated files.
+/// - For move operations, preserve source on failure.
+/// - Never silently delete.
+pub fn execute_one(rule: &OrganizerRule, source_path: &Path) -> Result<ExecuteResult> {
+    let src = source_path;
+    if !src.is_file() {
+        return Err(AppError::builder(
+            code::PATH_INVALID,
+            ErrorCategory::Filesystem,
+            "The triggering file doesn't exist or isn't a regular file.",
+        )
+        .build());
+    }
+    // Confirm the file is inside the rule's source folder.
+    let rule_src = Path::new(&rule.source_folder);
+    if !is_path_contained(src.parent().unwrap_or(Path::new("")), rule_src) {
+        return Err(AppError::builder(
+            code::PATH_INVALID,
+            ErrorCategory::Filesystem,
+            "The triggering file is not inside the rule's source folder.",
+        )
+        .build());
+    }
+    // Confirm the file matches the rule's condition.
+    let file_name = src.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    if !condition_matches(rule, file_name) {
+        return Ok(ExecuteResult {
+            succeeded: Vec::new(),
+            failed: Vec::new(),
+        });
+    }
+    // Create the destination folder if missing.
+    let dest = Path::new(&rule.dest_folder);
+    if !dest.exists() {
+        std::fs::create_dir_all(dest).map_err(|e| {
+            AppError::builder(
+                code::IO_FAILURE,
+                ErrorCategory::Filesystem,
+                "Paperu couldn't create the destination folder.",
+            )
+            .technical(e.to_string())
+            .build()
+        })?;
+    }
+    let policy = policy_of(rule);
+    let dest_name = src.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let dest_path = dest.join(dest_name);
+    let final_dest = match crate::filesystem::resolve_conflict(&dest_path, policy) {
+        Some(p) => p,
+        None => {
+            return Ok(ExecuteResult {
+                succeeded: Vec::new(),
+                failed: vec![ExecuteFailure {
+                    path: source_path.to_string_lossy().to_string(),
+                    name: dest_name.to_string(),
+                    error: "Destination exists — skipped (conflict policy: skip).".to_string(),
+                }],
+            });
+        }
+    };
+    let outcome = match rule.action.as_str() {
+        "move" => move_file(src, &final_dest),
+        "copy" => std::fs::copy(src, &final_dest).map(|_| ()),
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Unknown action",
+        )),
+    };
+    match outcome {
+        Ok(()) => Ok(ExecuteResult {
+            succeeded: vec![MatchedFile {
+                path: source_path.to_string_lossy().to_string(),
+                name: dest_name.to_string(),
+                matches: true,
+                action: rule.action.clone(),
+                dest_path: final_dest.to_string_lossy().to_string(),
+            }],
+            failed: Vec::new(),
+        }),
+        Err(e) => Ok(ExecuteResult {
+            succeeded: Vec::new(),
+            failed: vec![ExecuteFailure {
+                path: source_path.to_string_lossy().to_string(),
+                name: dest_name.to_string(),
+                error: e.to_string(),
+            }],
+        }),
+    }
+}
+
+/// True if `child` is the same as `parent` OR a subdirectory of `parent`.
+fn is_path_contained(child: &Path, parent: &Path) -> bool {
+    let child_components: Vec<_> = child.components().collect();
+    let parent_components: Vec<_> = parent.components().collect();
+    if child_components.len() < parent_components.len() {
+        return false;
+    }
+    child_components[..parent_components.len()] == parent_components[..]
+}
+
+/// True if the file name matches the rule's condition.
+fn condition_matches(rule: &OrganizerRule, file_name: &str) -> bool {
+    let name_lower = file_name.to_lowercase();
+    let value_lower = rule.condition_value.to_lowercase();
+    match rule.condition_type.as_str() {
+        "extension" => {
+            let v = value_lower.trim_start_matches('.');
+            name_lower.ends_with(&format!(".{v}"))
+        }
+        "filename_contains" => name_lower.contains(&value_lower),
+        "prefix" => name_lower.starts_with(&value_lower),
+        "suffix" => {
+            let stem = match name_lower.rsplit_once('.') {
+                Some((s, _)) => s,
+                None => &name_lower,
+            };
+            stem.ends_with(&value_lower)
+        }
+        _ => false,
+    }
+}
+
 /// Move a file, falling back to copy+delete across volumes. std::fs::rename
 /// is atomic on the same filesystem but fails across volume boundaries
 /// (e.g. C: → D: on Windows, / → /mnt on Linux). The fallback preserves

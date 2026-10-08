@@ -43,7 +43,13 @@ pub struct WatchRule {
     pub action_type: String,
     pub action_id: String,
     pub enabled: bool,
+    pub recursive: bool,
+    pub paused: bool,
+    pub last_triggered_at: Option<String>,
+    pub last_status: Option<String>,
+    pub name: Option<String>,
     pub created_at: String,
+    pub updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -99,7 +105,7 @@ pub fn create_rule(db: &Database, req: CreateWatchRuleRequest) -> Result<WatchRu
         let now = now_iso(conn)?;
         let enabled_int = i64::from(req.enabled.unwrap_or(true));
         conn.execute(
-            "INSERT INTO watch_folder (id, folder_path, condition_type, condition_value, action_type, action_id, enabled, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            "INSERT INTO watch_folder (id, folder_path, condition_type, condition_value, action_type, action_id, enabled, recursive, paused, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, 0, ?8, ?8)",
             params![id, req.folder_path, req.condition_type, req.condition_value, req.action_type, req.action_id, enabled_int, now],
         ).map_err(map_sqlite)?;
         read_row(conn, &id)
@@ -109,7 +115,7 @@ pub fn create_rule(db: &Database, req: CreateWatchRuleRequest) -> Result<WatchRu
 pub fn list_rules(db: &Database) -> Result<Vec<WatchRule>> {
     db.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, created_at FROM watch_folder ORDER BY created_at DESC",
+            "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, recursive, paused, last_triggered_at, last_status, name, created_at, updated_at FROM watch_folder ORDER BY created_at DESC",
         ).map_err(map_sqlite)?;
         let rows = stmt.query_map([], row_to_rule).map_err(map_sqlite)?;
         let mut out = Vec::new();
@@ -140,24 +146,61 @@ pub fn toggle_rule(db: &Database, id: &str, enabled: bool) -> Result<WatchRule> 
     })
 }
 
-/// Find all enabled rules whose folder_path matches `folder` (exact or
-/// prefix — the watched folder is the parent) AND whose condition
+/// Find all enabled, non-paused rules whose folder_path matches the
+/// event's folder (path-aware recursive matching) AND whose condition
 /// matches `file_name`. Returns the rules to dispatch.
+///
+/// P02 fix: the previous implementation did an exact folder-path match
+/// (`WHERE folder_path = ?1`). Now we load ALL enabled rules + check
+/// path containment using PathBuf components (not string starts_with).
+/// For recursive=1 rules, the event folder can be the rule's root OR
+/// any subdirectory. For recursive=0, only the exact root matches.
 pub fn find_matching_rules(db: &Database, folder: &str, file_name: &str) -> Result<Vec<WatchRule>> {
     db.with_conn(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, created_at FROM watch_folder WHERE enabled = 1 AND folder_path = ?1 ORDER BY created_at",
-        ).map_err(map_sqlite)?;
-        let rows = stmt.query_map(params![folder], row_to_rule).map_err(map_sqlite)?;
+            "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, recursive, paused, last_triggered_at, last_status, name, created_at, updated_at FROM watch_folder WHERE enabled = 1 AND paused = 0 ORDER BY created_at",
+        )
+        .map_err(map_sqlite)?;
+        let rows = stmt.query_map([], row_to_rule).map_err(map_sqlite)?;
+        let event_folder = std::path::Path::new(folder);
         let mut out = Vec::new();
         for r in rows {
             let rule = r.map_err(map_sqlite)?;
-            if condition_matches(&rule.condition_type, &rule.condition_value, file_name) {
+            let rule_root = std::path::Path::new(&rule.folder_path);
+            // Path-aware containment: the event folder must be the
+            // rule's root (for recursive=0) OR the rule's root OR a
+            // subdirectory of it (for recursive=1).
+            let matches_folder = if rule.recursive {
+                is_path_contained(event_folder, rule_root)
+            } else {
+                // Non-recursive: only the exact root.
+                paths_equal(event_folder, rule_root)
+            };
+            if matches_folder && condition_matches(&rule.condition_type, &rule.condition_value, file_name) {
                 out.push(rule);
             }
         }
         Ok(out)
     })
+}
+
+/// True if `child` is the same as `parent` OR a subdirectory of `parent`.
+/// Uses PathBuf components, NOT string starts_with — prevents
+/// `/home/user/downloads` from matching `/home/user/downloads-old`.
+fn is_path_contained(child: &std::path::Path, parent: &std::path::Path) -> bool {
+    let child_components: Vec<_> = child.components().collect();
+    let parent_components: Vec<_> = parent.components().collect();
+    if child_components.len() < parent_components.len() {
+        return false;
+    }
+    child_components[..parent_components.len()] == parent_components[..]
+}
+
+/// True if two paths are equal (component-by-component).
+fn paths_equal(a: &std::path::Path, b: &std::path::Path) -> bool {
+    let a_components: Vec<_> = a.components().collect();
+    let b_components: Vec<_> = b.components().collect();
+    a_components == b_components
 }
 
 /// True if the condition matches the file name.
@@ -297,7 +340,7 @@ pub fn dispatch_action(db: &Database, rule: &WatchRule, file_path: &str) -> Watc
                     message: "organizer rule no longer exists".to_string(),
                 };
             };
-            match crate::organizer::execute(&org_rule) {
+            match crate::organizer::execute_one(&org_rule, std::path::Path::new(file_path)) {
                 Ok(r) if r.failed.is_empty() => WatchDispatchResult {
                     rule_id: rule.id.clone(),
                     action_type: rule.action_type.clone(),
@@ -332,7 +375,7 @@ pub fn dispatch_action(db: &Database, rule: &WatchRule, file_path: &str) -> Watc
 
 fn read_row(conn: &rusqlite::Connection, id: &str) -> Result<WatchRule> {
     conn.query_row(
-        "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, created_at FROM watch_folder WHERE id = ?1",
+        "SELECT id, folder_path, condition_type, condition_value, action_type, action_id, enabled, recursive, paused, last_triggered_at, last_status, name, created_at, updated_at FROM watch_folder WHERE id = ?1",
         params![id], row_to_rule,
     )
     .map_err(|e| map_sqlite_not_found(e, id))
@@ -340,6 +383,8 @@ fn read_row(conn: &rusqlite::Connection, id: &str) -> Result<WatchRule> {
 
 fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<WatchRule> {
     let enabled_int: i64 = row.get(6)?;
+    let recursive_int: i64 = row.get(7).unwrap_or(1);
+    let paused_int: i64 = row.get(8).unwrap_or(0);
     Ok(WatchRule {
         id: row.get(0)?,
         folder_path: row.get(1)?,
@@ -348,7 +393,13 @@ fn row_to_rule(row: &rusqlite::Row) -> rusqlite::Result<WatchRule> {
         action_type: row.get(4)?,
         action_id: row.get(5)?,
         enabled: enabled_int != 0,
-        created_at: row.get(7)?,
+        recursive: recursive_int != 0,
+        paused: paused_int != 0,
+        last_triggered_at: row.get(9).ok(),
+        last_status: row.get(10).ok(),
+        name: row.get(11).ok(),
+        created_at: row.get(12).unwrap_or_else(|_| String::new()),
+        updated_at: row.get(13).ok(),
     })
 }
 

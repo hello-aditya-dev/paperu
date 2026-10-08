@@ -86,10 +86,15 @@ const MIGRATIONS: &[Migration] = &[
         label: "recipe_execution_details",
         sql: include_str!("../../migrations/0013_recipe_execution_details.sql"),
     },
+    Migration {
+        version: 14,
+        label: "automation_runtime",
+        sql: include_str!("../../migrations/0014_automation_runtime.sql"),
+    },
 ];
 
 /// The highest migration version known to this build.
-pub const LATEST_VERSION: u32 = 13;
+pub const LATEST_VERSION: u32 = 14;
 
 /// Run all pending migrations inside a transaction.
 pub fn run(conn: &Connection) -> Result<()> {
