@@ -7,9 +7,9 @@
  */
 
 import { useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
+import { saveFileAs } from "@/lib/save-as";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
-import { finalizeOutput, openPath, revealPath } from "@/lib/ipc";
+import { openPath, revealPath } from "@/lib/ipc";
 import { useRecentFiles } from "@/lib/recent-files";
 import { Button, Card } from "@paperu/ui";
 
@@ -42,15 +42,6 @@ export function PdfNotebookRoute(): React.ReactNode {
     setOutputPath(null);
     setProcessing(true);
     try {
-      const dest = await save({
-        title: "Save notebook as — Paperu",
-        defaultPath: "paperu-notebook.pdf",
-        filters: [{ name: "PDF", extensions: ["pdf"] }],
-      });
-      if (typeof dest !== "string" || dest.length === 0) {
-        setProcessing(false);
-        return;
-      }
       const { w, h } = SIZES[pageSize];
       const doc = await PDFDocument.create();
       const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -84,13 +75,16 @@ export function PdfNotebookRoute(): React.ReactNode {
         page.drawText(label, { x: (w - tw) / 2, y: 18, size: 9, font, color: rgb(0.6, 0.6, 0.6) });
       }
       const outBytes = new Uint8Array(await doc.save({ useObjectStreams: true }));
-      const finalized = await finalizeOutput(dest, "-notebook", "pdf", outBytes);
-      setOutputPath(finalized.outputPath);
+      // P0-A fix: use saveFileAs (writes to the EXACT user-chosen path)
+      // instead of finalizeOutput (which appends a suffix).
+      const result = await saveFileAs(outBytes, "paperu-notebook.pdf", [{ name: "PDF", extensions: ["pdf"] }]);
+      if (!result) { return; } // user cancelled
+      setOutputPath(result.outputPath);
       addRecent({
-        path: finalized.outputPath,
-        fileName: finalized.output.fileName,
-        kind: finalized.output.kind,
-        humanReadableSize: finalized.output.size.humanReadable,
+        path: result.outputPath,
+        fileName: result.output.fileName,
+        kind: result.output.kind,
+        humanReadableSize: result.output.size.humanReadable,
         operation: `Notebook (${template}, ${SIZES[pageSize].label}, ${pageCount}p)`,
         timestamp: Date.now(),
       });

@@ -95,7 +95,7 @@ pub fn finalize_output(request: FinalizeOutputRequest) -> Result<FinalizeOutputR
 
     // 3. Conflict resolution: rename with a numeric suffix if the
     //    destination already exists (canonical default).
-    let dest = resolve_conflict_rename(&dest);
+    let dest = resolve_conflict_rename(&dest)?;
 
     // 4. Decode the base64 bytes.
     let bytes = base64_decode(&request.bytes_base64)?;
@@ -158,10 +158,13 @@ impl FinalizeOutputRequest {
 }
 
 /// If `dest` already exists, append " (1)", " (2)", ... until a free
-/// name is found. Mirrors the canonical `ConflictStrategy::Rename`.
-fn resolve_conflict_rename(dest: &Path) -> PathBuf {
+/// name is found. Mirrors the canonical `ConflictPolicy::Rename`.
+/// P0-A fix: returns an error (structured failure) if ALL 9999 names
+/// collide — NEVER returns the occupied original (that would be a
+/// silent-overwrite risk).
+fn resolve_conflict_rename(dest: &Path) -> Result<PathBuf> {
     if !dest.exists() {
-        return dest.to_path_buf();
+        return Ok(dest.to_path_buf());
     }
     let dir = dest.parent().unwrap_or(Path::new("."));
     let stem = dest
@@ -177,11 +180,18 @@ fn resolve_conflict_rename(dest: &Path) -> PathBuf {
         };
         let candidate = dir.join(&name);
         if !candidate.exists() {
-            return candidate;
+            return Ok(candidate);
         }
     }
-    // Fallback: unlikely to reach here.
-    dest.to_path_buf()
+    // P0-A: all 9999 names collide — structured failure. NEVER return
+    // the occupied original (that would be a silent-overwrite risk).
+    Err(AppError::builder(
+        code::ALREADY_EXISTS,
+        ErrorCategory::Filesystem,
+        "Paperu couldn't find a free output filename — 9999 candidates all exist.",
+    )
+    .technical(format!("dest: {}", dest.display()))
+    .build())
 }
 
 /// Minimal base64 decoder (no external crate dependency to keep the
