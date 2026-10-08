@@ -558,3 +558,52 @@ Task: 90% continuation sprint — fix 5 defects + Wave 4-6 feature breadth.
 ### External blockers
 - Authenticode certificate (unsigned release candidate only).
 - Production licensing/payment credentials (licensing-client protocol is a remaining task; no secrets embedded).
+
+---
+Task ID: 90-sprint-cont-2-checkpoint
+Agent: Builder (Z.ai Code)
+Task: 90% continuation sprint — batch 2 (defects + 8 features).
+
+## Updated checkpoint (session 2)
+
+### Commits this session (all on agent/builder)
+- e4a2963: fix(security): 5 verified-audit defects (collision fallback, copy_verify order, adversarial ZIP, PDF page-tree)
+- a148d1b: feat(student): Signature Vault (migration 0008 + CRUD + route)
+- 8a03d1d: feat(file-power): USB Toolbox (copy+verify with SHA-256)
+- 8d4a83d: feat(pdf): standalone watermark + page numbers
+- d7f8026: feat(student): Forms Vault (migration 0009 + CRUD + route)
+- ae0a463: feat(pdf): PDF Notebook (blank/ruled/grid/dotted + Save As)
+- dffddb4: feat(student): Study Packs (pack CRUD + item management, migration 0006 schema reuse)
+- 9d62a0d: feat(student): Document Scanner (photos to A4 PDF)
+- 7be075a: fix(study-packs): packId→pack_id snake_case (Windows clippy)
+
+### Windows CI status
+- e4a2963 (defects): GREEN (6m8s)
+- 8d4a83d (PDF watermark): GREEN (6m42s)
+- dffddb4 (Study Packs): FAILED (packId non-snake-case on Windows clippy) → fixed in 7be075a
+- 7be075a (fix + Document Scanner): CI pending
+
+### Test counts
+- Rust: 138 (was 121 → +4 signature_vault +3 forms_vault +3 study_packs +7 defects)
+- Frontend: 134 (unchanged)
+
+### Features newly working this session
+- Signature Vault (ABSENT → USEFUL)
+- USB Toolbox (SHELL → USEFUL via copy_and_verify)
+- PDF Watermark + Page Numbers (ABSENT → USEFUL)
+- Forms Vault (ABSENT → USEFUL)
+- PDF Notebook (SHELL → USEFUL)
+- Study Packs (SHELL → USEFUL)
+- Document Scanner (SHELL → USEFUL)
+
+### Remaining (prioritized)
+1. Screenshot Bridge (pure frontend, reuses image-engine) — NEXT
+2. Backup Recipes (wire copy_and_verify) 
+3. Clipboard History (local-only, opt-in)
+4. Portal Ready flagship multi-constraint
+5. Passport/College Photo Studio
+6. PDF Annotations / Redaction / Compare
+7. Recipes / Timer Jobs / Watch rule→recipe
+8. Paperu Send / Webpage→PDF / FFmpeg utilities
+9. Business docs / Licensing / Updater / Analytics
+10. Single instance / Open With / file associations / window state
