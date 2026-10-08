@@ -668,7 +668,7 @@ export async function addStudyPackItem(request: AddItemRequest): Promise<StudyPa
   return call<StudyPackItem>(StudyPacksCommand.AddItem, { request });
 }
 export async function listStudyPackItems(packId: string): Promise<StudyPackItem[]> {
-  return call<StudyPackItem[]>(StudyPacksCommand.ListItems, { packId });
+  return call<StudyPackItem[]>(StudyPacksCommand.ListItems, { pack_id: packId });
 }
 export async function removeStudyPackItem(id: string): Promise<void> {
   await call<null>(StudyPacksCommand.RemoveItem, { id });

@@ -32,9 +32,9 @@ pub fn add_study_pack_item(
 #[tauri::command]
 pub fn list_study_pack_items(
     state: tauri::State<'_, AppState>,
-    packId: String,
+    pack_id: String,
 ) -> Result<Vec<StudyPackItem>> {
-    study_packs::list_items(&state.db, &packId)
+    study_packs::list_items(&state.db, &pack_id)
 }
 
 #[tauri::command]
