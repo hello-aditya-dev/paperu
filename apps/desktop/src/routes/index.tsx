@@ -101,6 +101,7 @@ const DownloadsCleanerRoute = lazy(() => import("./DownloadsCleanerRoute").then(
 const FolderOrganizerRoute = lazy(() => import("./FolderOrganizerRoute").then((m) => ({ default: m.FolderOrganizerRoute })));
 const CitationStudioRoute = lazy(() => import("./CitationStudioRoute").then((m) => ({ default: m.CitationStudioRoute })));
 const StudyPacksRoute = lazy(() => import("./StudyPacksRoute").then((m) => ({ default: m.StudyPacksRoute })));
+const BusinessDocsRoute = lazy(() => import("./BusinessDocsRoute").then((m) => ({ default: m.BusinessDocsRoute })));
 const PassportPhotoRoute = lazy(() => import("./PassportPhotoRoute").then((m) => ({ default: m.PassportPhotoRoute })));
 const PdfNotebookRoute = lazy(() => import("./PdfNotebookRoute").then((m) => ({ default: m.PdfNotebookRoute })));
 const WebpageToPdfRoute = lazy(() => import("./WebpageToPdfRoute").then((m) => ({ default: m.WebpageToPdfRoute })));
@@ -147,7 +148,7 @@ export const ROUTE_PATHS: ReadonlySet<string> = new Set([
   "/rename", "/filename-fixer", "/duplicates", "/quick-look",
   "/cleaner", "/organizer", "/citations", "/study-packs",
   "/webpage-pdf", "/screenshot-bridge", "/scanner", "/clipboard",
-  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch",
+  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch", "/business-docs",
 ]);
 
 export const router = createHashRouter([
@@ -184,6 +185,7 @@ export const router = createHashRouter([
         path: "assignment",
         element: withSuspense(<AssignmentStudioRoute />),
       },
+{ path: "business-docs", element: withSuspense(<BusinessDocsRoute />) },
 { path: "passport-photo", element: withSuspense(<PassportPhotoRoute />) },
       { path: "portal", element: withSuspense(<PortalReadyRoute />) },
       { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
