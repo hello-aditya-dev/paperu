@@ -86,6 +86,7 @@ pub mod study_packs;
 pub mod tasks;
 pub mod timer_jobs;
 pub mod watch;
+pub mod watch_rules;
 
 #[cfg(feature = "tauri-runtime")]
 pub mod state;
@@ -301,6 +302,10 @@ mod runtime {
                 crate::commands::watch::start_watch_folder,
                 crate::commands::watch::stop_watch_folder,
                 crate::commands::watch::current_watch_folder,
+                crate::commands::watch_rules::create_watch_rule,
+                crate::commands::watch_rules::list_watch_rules,
+                crate::commands::watch_rules::delete_watch_rule,
+                crate::commands::watch_rules::toggle_watch_rule,
                 crate::commands::signature_vault::add_signature_item,
                 crate::commands::signature_vault::list_signature_items,
                 crate::commands::signature_vault::update_signature_item,

@@ -64,6 +64,8 @@ pub mod timer_jobs;
 pub mod usb_toolbox;
 #[cfg(feature = "tauri-runtime")]
 pub mod watch;
+#[cfg(feature = "tauri-runtime")]
+pub mod watch_rules;
 
 #[cfg(feature = "tauri-runtime")]
 pub use analytics::*;
@@ -118,6 +120,8 @@ pub use timer_jobs::*;
 pub use usb_toolbox::*;
 #[cfg(feature = "tauri-runtime")]
 pub use watch::*;
+#[cfg(feature = "tauri-runtime")]
+pub use watch_rules::*;
 
 use serde::Serialize;
 
