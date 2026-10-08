@@ -46,6 +46,7 @@ import type {
   CreateRecipeRequest,
   TimerJob,
   CreateTimerRequest,
+  AnalyticsEvent,
   CopyVerifyResult,
   CopyVerifyRequest,
   FormField,
@@ -74,6 +75,7 @@ import {
   StudyPacksCommand,
   BackupRecipesCommand,
   TimerJobsCommand,
+  AnalyticsCommand,
   UsbToolboxCommand,
   WatchCommand,
   isAppError,
@@ -721,6 +723,20 @@ export async function deleteTimerJob(id: string): Promise<void> {
 }
 export async function toggleTimerJob(id: string, enabled: boolean): Promise<TimerJob> {
   return call<TimerJob>(TimerJobsCommand.Toggle, { id, enabled });
+}
+
+// ── Analytics (90% §67, COMMERCIAL-04) ────────────────────────────
+export async function logAnalyticsEvent(eventType: string, detail?: string | null): Promise<void> {
+  await call<null>(AnalyticsCommand.Log, { eventType, detail });
+}
+export async function listAnalyticsEvents(limit?: number): Promise<AnalyticsEvent[]> {
+  return call<AnalyticsEvent[]>(AnalyticsCommand.List, { limit });
+}
+export async function clearAnalyticsEvents(): Promise<void> {
+  await call<null>(AnalyticsCommand.Clear);
+}
+export async function analyticsEventCount(): Promise<number> {
+  return call<number>(AnalyticsCommand.Count);
 }
 // ── Notes ────────────────────────────────────────────────────────
 

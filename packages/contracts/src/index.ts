@@ -35,3 +35,4 @@ export * from "./forms_vault.js";
 export * from "./study_packs.js";
 export * from "./backup_recipes.js";
 export * from "./timer_jobs.js";
+export * from "./analytics.js";

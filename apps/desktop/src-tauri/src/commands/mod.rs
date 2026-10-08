@@ -12,6 +12,8 @@
 //! Rust functions testable on any platform.
 
 #[cfg(feature = "tauri-runtime")]
+pub mod analytics;
+#[cfg(feature = "tauri-runtime")]
 pub mod application_kit;
 #[cfg(feature = "tauri-runtime")]
 pub mod archive_studio;
@@ -58,6 +60,8 @@ pub mod usb_toolbox;
 #[cfg(feature = "tauri-runtime")]
 pub mod watch;
 
+#[cfg(feature = "tauri-runtime")]
+pub use analytics::*;
 #[cfg(feature = "tauri-runtime")]
 pub use application_kit::*;
 #[cfg(feature = "tauri-runtime")]

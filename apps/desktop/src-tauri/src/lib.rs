@@ -46,6 +46,7 @@
 )]
 #![allow(clippy::multiple_crate_versions)]
 
+pub mod analytics;
 pub mod application_kit;
 #[allow(clippy::all)]
 pub mod archive_studio;
@@ -250,6 +251,10 @@ mod runtime {
                 crate::commands::timer_jobs::list_timer_jobs,
                 crate::commands::timer_jobs::delete_timer_job,
                 crate::commands::timer_jobs::toggle_timer_job,
+                crate::commands::analytics::log_analytics_event,
+                crate::commands::analytics::list_analytics_events,
+                crate::commands::analytics::clear_analytics_events,
+                crate::commands::analytics::analytics_event_count,
                 crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())
