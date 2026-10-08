@@ -22,6 +22,8 @@ pub mod backup_recipes;
 #[cfg(feature = "tauri-runtime")]
 pub mod citations;
 #[cfg(feature = "tauri-runtime")]
+pub mod clipboard_history;
+#[cfg(feature = "tauri-runtime")]
 pub mod downloads_cleaner;
 #[cfg(feature = "tauri-runtime")]
 pub mod duplicate_finder;
@@ -71,6 +73,8 @@ pub use archive_studio::*;
 pub use backup_recipes::*;
 #[cfg(feature = "tauri-runtime")]
 pub use citations::*;
+#[cfg(feature = "tauri-runtime")]
+pub use clipboard_history::*;
 #[cfg(feature = "tauri-runtime")]
 pub use downloads_cleaner::*;
 #[cfg(feature = "tauri-runtime")]

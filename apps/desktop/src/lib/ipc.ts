@@ -48,6 +48,7 @@ import type {
   TimerJobHistory,
   CreateTimerRequest,
   UpdateTimerRequest,
+  ClipboardEntry,
   AnalyticsEvent,
   CopyVerifyResult,
   CopyVerifyRequest,
@@ -77,6 +78,7 @@ import {
   StudyPacksCommand,
   BackupRecipesCommand,
   TimerJobsCommand,
+  ClipboardHistoryCommand,
   AnalyticsCommand,
   UsbToolboxCommand,
   WatchCommand,
@@ -734,6 +736,26 @@ export async function getTimerJobHistory(id: string, limit?: number): Promise<Ti
 }
 export async function triggerTimerJobNow(id: string): Promise<TimerJob> {
   return call<TimerJob>(TimerJobsCommand.TriggerNow, { id });
+}
+
+// ── Clipboard History (P5, AUTOMATION-05) ────────────────────────
+export async function addClipboardEntry(content: string): Promise<ClipboardEntry> {
+  return call<ClipboardEntry>(ClipboardHistoryCommand.Add, { request: { content } });
+}
+export async function listClipboardEntries(query?: string): Promise<ClipboardEntry[]> {
+  return call<ClipboardEntry[]>(ClipboardHistoryCommand.List, { query });
+}
+export async function setClipboardEntryPinned(id: string, pinned: boolean): Promise<ClipboardEntry> {
+  return call<ClipboardEntry>(ClipboardHistoryCommand.SetPinned, { id, pinned });
+}
+export async function deleteClipboardEntry(id: string): Promise<void> {
+  await call<null>(ClipboardHistoryCommand.Delete, { id });
+}
+export async function clearClipboardHistory(): Promise<void> {
+  await call<null>(ClipboardHistoryCommand.Clear);
+}
+export async function clipboardEntryCount(): Promise<number> {
+  return call<number>(ClipboardHistoryCommand.Count);
 }
 
 // ── Analytics (90% §67, COMMERCIAL-04) ────────────────────────────

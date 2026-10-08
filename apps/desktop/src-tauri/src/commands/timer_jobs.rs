@@ -5,9 +5,7 @@ use crate::errors::Result;
 use crate::state::AppState;
 use crate::timer_jobs::clock::SystemClock;
 use crate::timer_jobs::scheduler::Scheduler;
-use crate::timer_jobs::{
-    self, CreateTimerRequest, TimerJob, TimerJobHistory, UpdateTimerRequest,
-};
+use crate::timer_jobs::{self, CreateTimerRequest, TimerJob, TimerJobHistory, UpdateTimerRequest};
 
 #[tauri::command]
 pub fn create_timer_job(

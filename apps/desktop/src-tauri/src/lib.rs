@@ -53,6 +53,7 @@ pub mod archive_studio;
 pub mod backup_recipes;
 #[allow(clippy::all)]
 pub mod citations;
+pub mod clipboard_history;
 pub mod commands;
 pub mod contracts;
 pub mod database;
@@ -161,6 +162,12 @@ mod runtime {
                     if let Err(err) = ws.startup_cleanup() {
                         tracing::warn!(error = %err, "temp cleanup failed");
                     }
+                }
+
+                // P5: purge expired clipboard history on startup.
+                // (7-day retention default; pinned entries survive.)
+                if let Err(err) = crate::clipboard_history::purge_old(&db, 7) {
+                    tracing::warn!(error = %err, "clipboard purge failed");
                 }
 
                 let state = AppState {
@@ -311,6 +318,12 @@ mod runtime {
                 crate::commands::timer_jobs::update_timer_job,
                 crate::commands::timer_jobs::get_timer_job_history,
                 crate::commands::timer_jobs::trigger_timer_job_now,
+                crate::commands::clipboard_history::add_clipboard_entry,
+                crate::commands::clipboard_history::list_clipboard_entries,
+                crate::commands::clipboard_history::set_clipboard_entry_pinned,
+                crate::commands::clipboard_history::delete_clipboard_entry,
+                crate::commands::clipboard_history::clear_clipboard_history,
+                crate::commands::clipboard_history::clipboard_entry_count,
                 crate::commands::analytics::log_analytics_event,
                 crate::commands::analytics::list_analytics_events,
                 crate::commands::analytics::clear_analytics_events,
