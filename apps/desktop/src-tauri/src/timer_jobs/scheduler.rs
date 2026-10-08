@@ -132,13 +132,44 @@ impl Scheduler {
                 }
             }
             "organizer_rule" => {
-                // Organizer dispatch is not yet wired (the rule module
-                // doesn't expose a "run by id" entry). Record as skipped
-                // so the user sees the job fired but no action was taken.
-                // This is honest — we don't claim functionality we lack.
-                DispatchResult {
-                    status: "skipped",
-                    message: "organizer_rule dispatch not yet implemented".to_string(),
+                // P01: dispatch an organizer rule. The organizer module
+                // exposes execute(rule) which moves/copies files per the
+                // rule's condition + action. We look up the rule by ID.
+                let rule = crate::organizer::list_rules(&self.db)
+                    .ok()
+                    .and_then(|rules| {
+                        rules
+                            .into_iter()
+                            .find(|r| r.id.as_deref() == Some(&job.action_id))
+                    });
+                let Some(rule) = rule else {
+                    return DispatchResult {
+                        status: "skipped",
+                        message: "organizer rule no longer exists".to_string(),
+                    };
+                };
+                match crate::organizer::execute(&rule) {
+                    Ok(r) => {
+                        if r.failed.is_empty() {
+                            DispatchResult {
+                                status: "success",
+                                message: format!("organized {} files", r.succeeded.len()),
+                            }
+                        } else {
+                            DispatchResult {
+                                status: "failure",
+                                message: format!(
+                                    "{} succeeded, {} failed",
+                                    r.succeeded.len(),
+                                    r.failed.len()
+                                ),
+                            }
+                        }
+                    }
+                    Err(e) => DispatchResult {
+                        status: "failure",
+                        message: e.message.clone(),
+                    },
                 }
             }
             "recipe" => {

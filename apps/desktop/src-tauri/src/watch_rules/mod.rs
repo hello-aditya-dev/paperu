@@ -280,12 +280,47 @@ pub fn dispatch_action(db: &Database, rule: &WatchRule, file_path: &str) -> Watc
                 },
             }
         }
-        "organizer_rule" => WatchDispatchResult {
-            rule_id: rule.id.clone(),
-            action_type: rule.action_type.clone(),
-            status: "skipped".to_string(),
-            message: "organizer_rule dispatch not yet implemented".to_string(),
-        },
+        "organizer_rule" => {
+            // P01: dispatch an organizer rule. Look up the rule by ID
+            // + call organizer::execute which moves/copies files per
+            // the rule's condition + action.
+            let org_rule = crate::organizer::list_rules(db).ok().and_then(|rules| {
+                rules
+                    .into_iter()
+                    .find(|r| r.id.as_deref() == Some(&rule.action_id))
+            });
+            let Some(org_rule) = org_rule else {
+                return WatchDispatchResult {
+                    rule_id: rule.id.clone(),
+                    action_type: rule.action_type.clone(),
+                    status: "skipped".to_string(),
+                    message: "organizer rule no longer exists".to_string(),
+                };
+            };
+            match crate::organizer::execute(&org_rule) {
+                Ok(r) if r.failed.is_empty() => WatchDispatchResult {
+                    rule_id: rule.id.clone(),
+                    action_type: rule.action_type.clone(),
+                    status: "success".to_string(),
+                    message: format!(
+                        "organized {} files (trigger: {file_path})",
+                        r.succeeded.len()
+                    ),
+                },
+                Ok(r) => WatchDispatchResult {
+                    rule_id: rule.id.clone(),
+                    action_type: rule.action_type.clone(),
+                    status: "failure".to_string(),
+                    message: format!("{} ok, {} failed", r.succeeded.len(), r.failed.len()),
+                },
+                Err(e) => WatchDispatchResult {
+                    rule_id: rule.id.clone(),
+                    action_type: rule.action_type.clone(),
+                    status: "failure".to_string(),
+                    message: e.message.clone(),
+                },
+            }
+        }
         _ => WatchDispatchResult {
             rule_id: rule.id.clone(),
             action_type: rule.action_type.clone(),
@@ -478,7 +513,9 @@ mod tests {
     }
 
     #[test]
-    fn dispatch_action_skips_organizer_rule_honestly() {
+    fn dispatch_action_skips_organizer_rule_when_rule_missing() {
+        // P01: organizer_rule dispatch is now WIRED. If the rule ID
+        // doesn't exist, dispatch is "skipped" (the rule was deleted).
         let db = fresh_db();
         let r = create_rule(
             &db,
@@ -487,14 +524,14 @@ mod tests {
                 condition_type: "extension".to_string(),
                 condition_value: "pdf".to_string(),
                 action_type: "organizer_rule".to_string(),
-                action_id: "rule-1".to_string(),
+                action_id: "nonexistent-rule-id".to_string(),
                 enabled: Some(true),
             },
         )
         .unwrap();
         let res = dispatch_action(&db, &r, "/downloads/doc.pdf");
         assert_eq!(res.status, "skipped");
-        assert!(res.message.contains("not yet implemented"));
+        assert!(res.message.contains("no longer exists"));
     }
 
     #[test]
