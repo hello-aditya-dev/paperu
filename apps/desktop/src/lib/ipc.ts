@@ -37,6 +37,10 @@ import type {
   RescueDiagnosis,
   Settings,
   SignatureItem,
+  StudyPack,
+  StudyPackItem,
+  CreatePackRequest,
+  AddItemRequest,
   CopyVerifyResult,
   CopyVerifyRequest,
   FormField,
@@ -62,6 +66,7 @@ import {
   RecentWorkCommand,
   RescueCommand,
   SignatureVaultCommand,
+  StudyPacksCommand,
   UsbToolboxCommand,
   WatchCommand,
   isAppError,
@@ -646,6 +651,27 @@ export async function removeFormsField(id: string): Promise<void> {
 /** Clear all form fields. */
 export async function clearFormsFields(): Promise<void> {
   await call<null>(FormsVaultCommand.Clear);
+}
+
+
+// ── Study Packs (90% §41) ─────────────────────────────────────────
+export async function createStudyPack(request: CreatePackRequest): Promise<StudyPack> {
+  return call<StudyPack>(StudyPacksCommand.Create, { request });
+}
+export async function listStudyPacks(): Promise<StudyPack[]> {
+  return call<StudyPack[]>(StudyPacksCommand.List);
+}
+export async function deleteStudyPack(id: string): Promise<void> {
+  await call<null>(StudyPacksCommand.Delete, { id });
+}
+export async function addStudyPackItem(request: AddItemRequest): Promise<StudyPackItem> {
+  return call<StudyPackItem>(StudyPacksCommand.AddItem, { request });
+}
+export async function listStudyPackItems(packId: string): Promise<StudyPackItem[]> {
+  return call<StudyPackItem[]>(StudyPacksCommand.ListItems, { packId });
+}
+export async function removeStudyPackItem(id: string): Promise<void> {
+  await call<null>(StudyPacksCommand.RemoveItem, { id });
 }
 
 // ── Notes ────────────────────────────────────────────────────────

@@ -78,6 +78,7 @@ pub mod rename;
 pub mod security;
 pub mod settings;
 pub mod signature_vault;
+pub mod study_packs;
 pub mod tasks;
 pub mod watch;
 
@@ -216,6 +217,12 @@ mod runtime {
                 crate::commands::forms_vault::list_forms_fields,
                 crate::commands::forms_vault::remove_forms_field,
                 crate::commands::forms_vault::clear_forms_fields,
+                crate::commands::study_packs::create_study_pack,
+                crate::commands::study_packs::list_study_packs,
+                crate::commands::study_packs::delete_study_pack,
+                crate::commands::study_packs::add_study_pack_item,
+                crate::commands::study_packs::list_study_pack_items,
+                crate::commands::study_packs::remove_study_pack_item,
                 crate::commands::usb_toolbox::copy_and_verify_file,
             ])
             .run(tauri::generate_context!())
