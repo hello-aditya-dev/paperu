@@ -53,6 +53,7 @@ const SignPdfRoute = lazy(() =>
 const FillPdfRoute = lazy(() =>
   import("./FillPdfRoute").then((m) => ({ default: m.FillPdfRoute })),
 );
+const PdfWatermarkRoute = lazy(() => import("./PdfWatermarkRoute").then((m) => ({ default: m.PdfWatermarkRoute })));
 const PdfPageOpsRoute = lazy(() =>
   import("./PdfPageOpsRoute").then((m) => ({ default: m.PdfPageOpsRoute })),
 );
@@ -154,6 +155,7 @@ export const router = createHashRouter([
       },
       { path: "pdf/sign", element: withSuspense(<SignPdfRoute />) },
       { path: "pdf/fill", element: withSuspense(<FillPdfRoute />) },
+{ path: "pdf/watermark", element: withSuspense(<PdfWatermarkRoute />) },
       { path: "pdf/pages", element: withSuspense(<PdfPageOpsRoute />) },
       { path: "about", element: <AboutRoute /> },
       { path: "diagnostics", element: <DiagnosticsRoute /> },
