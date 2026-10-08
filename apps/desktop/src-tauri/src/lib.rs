@@ -103,6 +103,7 @@ mod runtime {
 
     /// Build and run the Paperu Tauri application.
     pub fn run() {
+        use tauri::Emitter;
         tauri::Builder::default()
             .plugin(tauri_plugin_dialog::init())
             .plugin(tauri_plugin_window_state::Builder::default().build())
