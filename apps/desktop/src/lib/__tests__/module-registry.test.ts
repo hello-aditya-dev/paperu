@@ -159,41 +159,55 @@ describe("module registry", () => {
     });
   });
 
-  // 90% §8: registry truth — available modules must agree with the feature
-  // inventory + every available module must have a real, non-empty route.
-  describe("registry truth (90% §8)", () => {
-    it("every available module has a real route starting with / or #", () => {
+  // 90% §1 defect 5: real route resolution — every available module's
+  // route must exist in the ROUTE_PATHS set exported from the router.
+  // This catches the regression where a module says available:true but
+  // its route isn't actually in the router (would 404 at runtime).
+  describe("registry truth (90% §8 + defect 5)", () => {
+    it("every available module's route resolves to a real ROUTE_PATH", async () => {
+      const { ROUTE_PATHS } = await import("../../routes/index");
       const available = getAvailableModules();
       expect(available.length).toBeGreaterThan(0);
+      const missing: string[] = [];
       for (const m of available) {
-        // "/" routes are real pages; "#" routes are in-app panels (e.g. shelf).
-        expect(m.route).toMatch(/^[/#]/);
-        expect(m.route.length).toBeGreaterThanOrEqual(1);
+        // "/" and "#shelf" are special (index + in-app panel).
+        if (m.route === "/" || m.route.startsWith("#")) continue;
+        if (!ROUTE_PATHS.has(m.route)) {
+          missing.push(`${m.id} → ${m.route}`);
+        }
       }
+      expect(missing).toEqual([] as string[]);
     });
 
-    it("available module routes are unique", () => {
-      const routes = getAvailableModules().map((m) => m.route);
+    it("available module routes are unique (except # panels)", () => {
+      const routes = getAvailableModules()
+        .filter((m) => !m.route.startsWith("#"))
+        .map((m) => m.route);
       expect(new Set(routes).size).toBe(routes.length);
     });
 
-    it("archive-studio is available (registry ↔ inventory agreement)", () => {
+    it("archive-studio is available + route is in ROUTE_PATHS", async () => {
+      const { ROUTE_PATHS } = await import("../../routes/index");
       const m = getModule("archive-studio");
       expect(m).toBeDefined();
       expect(m!.available).toBe(true);
+      expect(ROUTE_PATHS.has(m!.route)).toBe(true);
     });
 
-    it("watch-folders is available (registry ↔ inventory agreement)", () => {
+    it("watch-folders is available + route is in ROUTE_PATHS", async () => {
+      const { ROUTE_PATHS } = await import("../../routes/index");
       const m = getModule("watch-folders");
       expect(m).toBeDefined();
       expect(m!.available).toBe(true);
+      expect(ROUTE_PATHS.has(m!.route)).toBe(true);
     });
 
-    it("study-reader is available + resolves to /reader", () => {
+    it("study-reader is available + route is in ROUTE_PATHS", async () => {
+      const { ROUTE_PATHS } = await import("../../routes/index");
       const m = getModule("study-reader");
       expect(m).toBeDefined();
       expect(m!.available).toBe(true);
-      expect(m!.route).toBe("/reader");
+      expect(ROUTE_PATHS.has(m!.route)).toBe(true);
     });
   });
 });

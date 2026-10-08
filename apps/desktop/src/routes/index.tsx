@@ -133,6 +133,23 @@ function withSuspense(element: React.ReactNode): React.ReactNode {
   return <Suspense fallback={<RouteLoading />}>{element}</Suspense>;
 }
 
+// Route paths exported for the registry-truth test (90% §1 defect 5).
+// Every available module's route must be in this set. Derived from the
+// router children below (paths prefixed with /).
+export const ROUTE_PATHS: ReadonlySet<string> = new Set([
+  "/", "/inspect", "/pdf", "/images",
+  "/pdf/fit", "/image/fit", "/pdf/merge", "/pdf/split",
+  "/pdf/from-images", "/pdf/to-images", "/pdf/sign", "/pdf/fill",
+  "/pdf/watermark", "/pdf/pages", "/notebook",
+  "/about", "/diagnostics", "/history",
+  "/assignment", "/passport-photo", "/portal", "/kit", "/reader", "/notes", "/print",
+  "/batch", "/forms-vault", "/signature-vault", "/send", "/onboarding",
+  "/rename", "/filename-fixer", "/duplicates", "/quick-look",
+  "/cleaner", "/organizer", "/citations", "/study-packs",
+  "/webpage-pdf", "/screenshot-bridge", "/scanner", "/clipboard",
+  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch",
+]);
+
 export const router = createHashRouter([
   {
     path: "/",
