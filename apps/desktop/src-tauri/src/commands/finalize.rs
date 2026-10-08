@@ -94,30 +94,16 @@ pub fn finalize_output(request: FinalizeOutputRequest) -> Result<FinalizeOutputR
     let dest = source_dir.join(&dest_name);
 
     // 3. Conflict resolution: rename with a numeric suffix if the
-    //    destination already exists (canonical default).
+    //    destination already exists (canonical default). NEVER overwrite.
     let dest = resolve_conflict_rename(&dest)?;
 
     // 4. Decode the base64 bytes.
     let bytes = base64_decode(&request.bytes_base64)?;
 
-    // 5. Write to a temp file under TempWorkspace.
-    let ws = filesystem::temp::TempWorkspace::ensure()?;
-    let temp_suffix = format!(".{}", request.extension);
-    let temp = ws.new_file(&temp_suffix);
-    std::fs::write(&temp, &bytes).map_err(|e| {
-        AppError::builder(
-            code::IO_FAILURE,
-            ErrorCategory::Filesystem,
-            "Paperu could not write the temporary output.",
-        )
-        .technical(e.to_string())
-        .build()
-    })?;
-
-    // 6. Validate the temp file is non-empty.
-    let temp_meta = std::fs::metadata(&temp).map_err(AppError::from)?;
-    if temp_meta.len() == 0 {
-        let _ = std::fs::remove_file(&temp);
+    // 5. Validate non-empty (an empty output is a processing failure —
+    //    we surface it as OUTPUT_VALIDATION_FAILED rather than writing
+    //    a zero-byte file the user might mistake for a real result).
+    if bytes.is_empty() {
         return Err(AppError::builder(
             code::OUTPUT_VALIDATION_FAILED,
             ErrorCategory::Processing,
@@ -128,11 +114,14 @@ pub fn finalize_output(request: FinalizeOutputRequest) -> Result<FinalizeOutputR
         .build());
     }
 
-    // 7. Atomically finalize: move temp into the destination.
-    if let Err(e) = filesystem::temp::atomic_finalize(&temp, &dest, false) {
-        let _ = std::fs::remove_file(&temp);
-        return Err(e);
-    }
+    // 6. Clean up any stale Paperu temps in the destination directory
+    //    (from a previous crashed operation).
+    filesystem::publish::cleanup_stale_temps(source_dir);
+
+    // 7. Publish bytes atomically: stage temp in dest dir → write →
+    //    hard_link (no-overwrite, atomic). The destination is never
+    //    left partial on crash; the source is never touched.
+    filesystem::publish::publish_bytes(&dest, &bytes, false)?;
 
     // 8. Inspect the output to return real metadata.
     let dest_path = filesystem::paths::path_to_file_path(&dest);

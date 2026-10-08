@@ -14,10 +14,12 @@ pub mod conflict;
 pub mod copy_verify;
 pub mod inspect;
 pub mod paths;
+pub mod publish;
 pub mod temp;
 
 pub use conflict::*;
 pub use copy_verify::*;
 pub use inspect::*;
 pub use paths::*;
+pub use publish::*;
 pub use temp::*;

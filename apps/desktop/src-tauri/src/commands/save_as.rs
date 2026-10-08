@@ -12,7 +12,6 @@
 //! validated and written atomically — a crash mid-write never produces
 //! a partial file at the destination.
 
-use std::fs;
 use std::path::Path;
 
 use crate::contracts::common::FilePath;
@@ -30,7 +29,7 @@ pub struct SaveFileAsRequest {
     #[serde(rename = "bytesBase64")]
     pub bytes_base64: String,
     /// True if the user explicitly accepted overwrite of an existing file.
-    /// False is the safe default — atomic_finalize refuses to overwrite.
+    /// False is the safe default — publish refuses to overwrite.
     pub overwrite: bool,
 }
 
@@ -43,12 +42,20 @@ pub struct SaveFileAsResponse {
 }
 
 /// `save_file_as` command: write bytes to a user-chosen path.
+///
+/// P0-01: uses the canonical `publish_bytes` primitive — temp is staged
+/// in the destination directory (same-volume → atomic rename), and the
+/// publication uses `hard_link` (no-overwrite) or `rename` (overwrite)
+/// which are atomic on both Windows and POSIX. A crash mid-write leaves
+/// only the temp file (recognizable `.paperu-{uuid}.{ext}.tmp`); the
+/// user's existing destination is never touched.
 #[cfg_attr(feature = "tauri-runtime", tauri::command)]
 pub fn save_file_as(request: SaveFileAsRequest) -> Result<SaveFileAsResponse> {
     // 1. Validate the destination path (absolute, no traversal, sane).
     let dest = filesystem::paths::validate_input_path(&request.dest_path)?;
 
-    // 2. Parent directory must exist.
+    // 2. Parent directory must exist (we don't auto-create for Save As —
+    //    the user explicitly chose this path; a missing parent is an error).
     let parent = dest.parent().ok_or_else(|| {
         AppError::builder(
             code::PATH_INVALID,
@@ -70,26 +77,26 @@ pub fn save_file_as(request: SaveFileAsRequest) -> Result<SaveFileAsResponse> {
     // 3. Decode the base64 bytes.
     let bytes = base64_decode(&request.bytes_base64)?;
 
-    // 4. Write to a temp file under the TempWorkspace, then atomic_finalize.
-    let ws = filesystem::temp::TempWorkspace::ensure()?;
-    let temp = ws.new_file(".save-as");
-    fs::write(&temp, &bytes).map_err(|err| {
-        AppError::builder(
-            code::IO_FAILURE,
-            ErrorCategory::Filesystem,
-            "Paperu couldn't write the save file.",
+    // 4. Reject empty payloads (a 0-byte file is almost always a bug).
+    if bytes.is_empty() {
+        return Err(AppError::builder(
+            code::OUTPUT_VALIDATION_FAILED,
+            ErrorCategory::Processing,
+            "Paperu won't save an empty file.",
         )
-        .technical(err.to_string())
-        .build()
-    })?;
+        .severity(ErrorSeverity::Error)
+        .recoverability(Recoverability::ActionRequired)
+        .build());
+    }
 
-    // 5. Atomic finalize. If overwrite is false and dest exists, this
-    //    returns ALREADY_EXISTS — the frontend can re-prompt the user.
-    filesystem::temp::atomic_finalize(&temp, &dest, request.overwrite).inspect_err(|_| {
-        let _ = fs::remove_file(&temp);
-    })?;
+    // 5. Clean up any stale Paperu temps in the destination directory.
+    filesystem::publish::cleanup_stale_temps(parent);
 
-    // 6. Read back real metadata about the output (size, kind, etc.).
+    // 6. Publish atomically. If overwrite=false and dest exists, this
+    //    returns ALREADY_EXISTS — the frontend re-prompts the user.
+    filesystem::publish::publish_bytes(&dest, &bytes, request.overwrite)?;
+
+    // 7. Read back real metadata about the output (size, kind, etc.).
     let output = inspect_file_at(&dest)?;
     Ok(SaveFileAsResponse {
         output_path: dest.to_string_lossy().to_string(),
@@ -98,11 +105,7 @@ pub fn save_file_as(request: SaveFileAsRequest) -> Result<SaveFileAsResponse> {
 }
 
 /// Inspect a file at an absolute path (reuses the canonical inspect logic).
-/// We call the inner function to avoid the request-wrapper layer.
 fn inspect_file_at(path: &Path) -> Result<InspectFileResponse> {
-    // Delegate to the canonical inspect command's inner logic. The
-    // public inspect_file takes a request wrapper; we want the inner.
-    // For now, call filesystem::inspect directly.
     crate::filesystem::inspect::inspect_path(path)
 }
 
@@ -153,7 +156,6 @@ fn base64_decode(s: &str) -> Result<Vec<u8>> {
     Ok(out)
 }
 
-#[cfg(test)]
 #[cfg(test)]
 fn base64_encode(data: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -241,5 +243,104 @@ mod tests {
         let encoded = base64_encode(original);
         let decoded = base64_decode(&encoded).unwrap();
         assert_eq!(decoded, original);
+    }
+
+    // ── P0-01 tests: cross-volume, read-only, collision, non-ASCII ─
+
+    #[test]
+    fn save_file_as_non_ascii_path() {
+        let tmp = std::env::temp_dir().join(format!("paperu-save-as-u-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let dest = tmp.join("Ünïcödé-文件.pdf");
+        let req = SaveFileAsRequest {
+            dest_path: dest.to_string_lossy().to_string(),
+            bytes_base64: base64_encode(b"unicode"),
+            overwrite: false,
+        };
+        save_file_as(req).unwrap();
+        assert_eq!(std::fs::read(&dest).unwrap(), b"unicode");
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn save_file_as_rejects_empty_payload() {
+        // P0-01: an empty payload is a bug — must surface an error,
+        // not write a 0-byte file the user might mistake for a result.
+        let tmp =
+            std::env::temp_dir().join(format!("paperu-save-as-empty-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let dest = tmp.join("empty.pdf");
+        let req = SaveFileAsRequest {
+            dest_path: dest.to_string_lossy().to_string(),
+            bytes_base64: base64_encode(b""),
+            overwrite: false,
+        };
+        let res = save_file_as(req);
+        assert!(res.is_err(), "empty payload must be rejected");
+        assert!(!dest.exists(), "no zero-byte file written");
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn save_file_as_missing_parent_dir_errors_cleanly() {
+        let dest = std::env::temp_dir()
+            .join(format!("paperu-missing-{}", uuid::Uuid::new_v4()))
+            .join("nonexistent")
+            .join("out.pdf");
+        let req = SaveFileAsRequest {
+            dest_path: dest.to_string_lossy().to_string(),
+            bytes_base64: base64_encode(b"data"),
+            overwrite: false,
+        };
+        let res = save_file_as(req);
+        assert!(res.is_err(), "missing parent must error");
+        assert!(!dest.exists());
+    }
+
+    #[test]
+    fn save_file_as_source_remains_unchanged() {
+        // The destination is the ONLY file affected — no source file is
+        // touched. We simulate a source by writing one, then saving
+        // a different file next to it.
+        let tmp = std::env::temp_dir().join(format!("paperu-save-as-src-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let source = tmp.join("source.pdf");
+        std::fs::write(&source, b"original source bytes").unwrap();
+        let dest = tmp.join("output.pdf");
+        let req = SaveFileAsRequest {
+            dest_path: dest.to_string_lossy().to_string(),
+            bytes_base64: base64_encode(b"new output"),
+            overwrite: false,
+        };
+        save_file_as(req).unwrap();
+        // Source is untouched.
+        assert_eq!(std::fs::read(&source).unwrap(), b"original source bytes");
+        assert_eq!(std::fs::read(&dest).unwrap(), b"new output");
+        // Only two files: source + dest (no leftover temp).
+        let count = std::fs::read_dir(&tmp).unwrap().count();
+        assert_eq!(count, 2, "no leftover temp file");
+        std::fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn save_file_as_leaves_no_temp_on_existing_dest() {
+        // When ALREADY_EXISTS is returned, no temp must be left behind.
+        let tmp = std::env::temp_dir().join(format!(
+            "paperu-save-as-no-leftover-{}",
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&tmp).unwrap();
+        let dest = tmp.join("exists.pdf");
+        std::fs::write(&dest, b"first").unwrap();
+        let req = SaveFileAsRequest {
+            dest_path: dest.to_string_lossy().to_string(),
+            bytes_base64: base64_encode(b"second"),
+            overwrite: false,
+        };
+        let _ = save_file_as(req);
+        // Only the original dest — no temp.
+        assert_eq!(std::fs::read_dir(&tmp).unwrap().count(), 1);
+        assert_eq!(std::fs::read(&dest).unwrap(), b"first");
+        std::fs::remove_dir_all(&tmp).ok();
     }
 }

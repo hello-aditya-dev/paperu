@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use tracing::{info, warn};
 
-use crate::errors::{code, AppError, ErrorCategory, Result};
+use crate::errors::{AppError, Result};
 
 /// A managed temporary workspace for Paperu.
 pub struct TempWorkspace {
@@ -82,33 +82,37 @@ impl TempWorkspace {
     }
 }
 
-/// Atomically finalize a temp output into its destination: write to a
-/// temp path, then rename into place. On Windows, `rename` across
-/// volumes fails, so we fall back to copy+delete only when the caller
-/// has explicitly accepted overwrite semantics. For the non-destructive
-/// default, the destination must not already exist.
+/// Atomically finalize a temp output into its destination.
+///
+/// **Deprecated for new code** — use `crate::filesystem::publish::publish`
+/// or `publish_bytes` instead, which stage the temp file in the
+/// destination directory (same-volume → truly atomic on all platforms).
+///
+/// This function is retained for backwards-compatibility. It wraps the
+/// new `publish` primitive: if the temp is in the same directory as the
+/// destination, the rename is atomic; if not (cross-volume), we copy
+/// the temp into a destination-local staging path first, then publish.
+/// On error the destination is never left partial.
 pub fn atomic_finalize(temp: &Path, dest: &Path, overwrite: bool) -> Result<()> {
-    if dest.exists() && !overwrite {
-        return Err(AppError::builder(
-            code::ALREADY_EXISTS,
-            ErrorCategory::Filesystem,
-            "An output with that name already exists.",
-        )
-        .detail("Paperu never overwrites your files unless you explicitly choose to.")
-        .technical(format!("destination exists: {}", dest.display()))
-        .build());
+    // Fast path: temp is already in dest's directory.
+    let temp_parent = temp.parent();
+    let dest_parent = dest.parent();
+    if temp_parent == dest_parent {
+        return crate::filesystem::publish::publish(temp, dest, overwrite);
     }
-    // rename is atomic on the same filesystem.
-    match fs::rename(temp, dest) {
-        Ok(()) => Ok(()),
-        Err(_err) if overwrite => {
-            // Cross-volume fallback for explicit overwrite only.
-            fs::copy(temp, dest).map_err(AppError::from)?;
-            let _ = fs::remove_file(temp);
-            Ok(())
-        }
-        Err(err) => Err(AppError::from(err)),
-    }
+    // Slow path: temp is elsewhere (e.g. OS temp dir). Stage it
+    // destination-locally first, then publish — same-volume atomic.
+    let dest_dir = dest.parent().unwrap_or(Path::new("."));
+    let ext = dest.extension().and_then(|e| e.to_str()).unwrap_or("tmp");
+    let local_temp = crate::filesystem::publish::stage_path(dest_dir, ext)?;
+    fs::copy(temp, &local_temp).map_err(|e| {
+        let _ = fs::remove_file(&local_temp);
+        AppError::from(e)
+    })?;
+    crate::filesystem::publish::publish(&local_temp, dest, overwrite)?;
+    // The original temp (if any) is no longer needed — remove it.
+    let _ = fs::remove_file(temp);
+    Ok(())
 }
 
 #[cfg(test)]

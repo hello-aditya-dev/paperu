@@ -176,17 +176,9 @@ pub fn copy_and_verify(
         ))
         .build());
     }
-    // Verified — finalize the atomic rename.
-    std::fs::rename(&temp_path, &final_dest).map_err(|e| {
-        let _ = std::fs::remove_file(&temp_path);
-        AppError::builder(
-            code::IO_FAILURE,
-            ErrorCategory::Filesystem,
-            "Paperu couldn't finalize the copy (rename temp → dest).",
-        )
-        .technical(e.to_string())
-        .build()
-    })?;
+    // Verified — finalize the atomic publication. P0-01: use the shared
+    // `publish` primitive (same-volume rename → atomic on all platforms).
+    crate::filesystem::publish::publish(&temp_path, &final_dest, false)?;
     Ok(CopyVerifyResult {
         destination: final_dest.to_string_lossy().to_string(),
         source_hash: hex(&source_hash),
