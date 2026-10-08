@@ -101,6 +101,8 @@ const DownloadsCleanerRoute = lazy(() => import("./DownloadsCleanerRoute").then(
 const FolderOrganizerRoute = lazy(() => import("./FolderOrganizerRoute").then((m) => ({ default: m.FolderOrganizerRoute })));
 const CitationStudioRoute = lazy(() => import("./CitationStudioRoute").then((m) => ({ default: m.CitationStudioRoute })));
 const StudyPacksRoute = lazy(() => import("./StudyPacksRoute").then((m) => ({ default: m.StudyPacksRoute })));
+const MetadataStudioRoute = lazy(() => import("./MetadataStudioRoute").then((m) => ({ default: m.MetadataStudioRoute })));
+const PdfCompareRoute = lazy(() => import("./PdfCompareRoute").then((m) => ({ default: m.PdfCompareRoute })));
 const BusinessDocsRoute = lazy(() => import("./BusinessDocsRoute").then((m) => ({ default: m.BusinessDocsRoute })));
 const PassportPhotoRoute = lazy(() => import("./PassportPhotoRoute").then((m) => ({ default: m.PassportPhotoRoute })));
 const PdfNotebookRoute = lazy(() => import("./PdfNotebookRoute").then((m) => ({ default: m.PdfNotebookRoute })));
@@ -148,7 +150,7 @@ export const ROUTE_PATHS: ReadonlySet<string> = new Set([
   "/rename", "/filename-fixer", "/duplicates", "/quick-look",
   "/cleaner", "/organizer", "/citations", "/study-packs",
   "/webpage-pdf", "/screenshot-bridge", "/scanner", "/clipboard",
-  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch", "/business-docs",
+  "/converter", "/archive", "/rescue", "/usb", "/backup", "/timer", "/watch", "/business-docs", "/pdf/compare", "/metadata-studio",
 ]);
 
 export const router = createHashRouter([
@@ -185,7 +187,8 @@ export const router = createHashRouter([
         path: "assignment",
         element: withSuspense(<AssignmentStudioRoute />),
       },
-{ path: "business-docs", element: withSuspense(<BusinessDocsRoute />) },
+{ path: "pdf/compare", element: withSuspense(<PdfCompareRoute />) },
+      { path: "business-docs", element: withSuspense(<BusinessDocsRoute />) },
 { path: "passport-photo", element: withSuspense(<PassportPhotoRoute />) },
       { path: "portal", element: withSuspense(<PortalReadyRoute />) },
       { path: "kit", element: withSuspense(<ApplicationKitRoute />) },
@@ -215,6 +218,7 @@ export const router = createHashRouter([
       { path: "clipboard", element: withSuspense(<ClipboardHistoryRoute />) },
       { path: "converter", element: withSuspense(<OfflineConverterRoute />) },
       { path: "archive", element: withSuspense(<ArchiveStudioRoute />) },
+      { path: "metadata-studio", element: withSuspense(<MetadataStudioRoute />) },
       { path: "rescue", element: withSuspense(<FileRescueRoute />) },
       { path: "usb", element: withSuspense(<UsbToolboxRoute />) },
       { path: "backup", element: withSuspense(<BackupRecipesRoute />) },
