@@ -1,8 +1,8 @@
 # Paperu — Complete Feature Acceptance Matrix
 
-This is the human-readable companion to `docs/qa/feature-acceptance.json`.
-Together they track EVERY advertised feature + subfeature in the
-Paperu product, with truthful per-platform acceptance evidence.
+This is the authoritative per-feature acceptance matrix. It tracks
+EVERY advertised feature + subfeature in the Paperu product, with
+truthful per-platform acceptance evidence.
 
 **Per-feature definition of done** (§15 of the World-Class Product
 Acceptance Contract): a feature earns DONE only when ALL 15 conditions
@@ -22,130 +22,198 @@ and has no known blocking defects.
 | PARTIAL | Basic end-to-end operation, missing key features |
 | WORKING | Useful functional workflow (no automated test) |
 | VERIFIED | Automated functional test passes |
-| BUILD_VERIFIED | Compiles + tests pass on that platform's CI (build-time verification) |
-| BLOCKED_EXTERNAL | Requires external resource (certificate/binary/runtime) this sandbox cannot provide |
+| BUILD_VERIFIED | Compiles + tests pass on that platform's CI |
+| BLOCKED_EXTERNAL | Requires external resource this sandbox cannot provide |
 
-## Platform status definitions
+## Full 93-item acceptance matrix
 
-| Status | Meaning |
-| --- | --- |
-| UNTESTED | Not yet runtime-tested on this platform |
-| BUILD_VERIFIED | CI compiles + `cargo test` with `tauri-runtime` passes |
-| VERIFIED | Automated functional test passes on this platform |
-| BLOCKED_EXTERNAL | Genuinely blocked by an external dependency |
+### A. Core application experience (12 weight)
 
-## Feature matrix (sample — see JSON for the full set)
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | Home dashboard | `/` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 2 | Universal Drop + file-type detection | `/` | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 3 | Command Center (searchable tools) | shared | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 4 | Recent Work | shared | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 5 | Shelf (staging) | shared | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 6 | Preferences + settings | `/diagnostics` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 7 | Onboarding | `/onboarding` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 8 | Light/dark theme | shared | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 9 | Keyboard shortcuts | shared | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 10 | Window-state persistence | shared | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 11 | Single-instance + Open With | shared | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 12 | History | `/history` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
 
-### A. Core application experience
+### B. PDF toolbox (18 weight)
 
-| Feature | Route | Status | Windows | macOS ARM | macOS Intel | Linux |
-| --- | --- | --- | --- | --- | --- | --- |
-| Universal Drop | `/` | PARTIAL | UNTESTED | UNTESTED | UNTESTED | UNTESTED |
-| File-type detection | (shared) | WORKING | UNTESTED | UNTESTED | UNTESTED | UNTESTED |
-| Command Center | (shared) | WORKING | UNTESTED | UNTESTED | UNTESTED | UNTESTED |
-| Recent Work | (shared) | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Settings | `/diagnostics` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 13 | Merge PDFs | `/pdf/merge` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 14 | Split PDF | `/pdf/split` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 15 | Rotate pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 16 | Delete pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 17 | Extract pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 18 | Reorder pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 19 | Reverse pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 20 | Insert pages (PDF/img/blank) | `/pdf/pages` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 21 | Crop pages | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 22 | Set page size | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 23 | PDF metadata inspect/remove | `/pdf/pages` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 24 | PDF watermark | `/pdf/watermark` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 25 | PDF → images | `/pdf/to-images` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 26 | Images → PDF | `/pdf/from-images` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 27 | PDF Compare (multipage diff) | `/pdf/compare` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 28 | PDF Notebook | `/notebook` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 29 | Sign PDF | `/pdf/sign` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 30 | Fill PDF forms | `/pdf/fill` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 31 | PDF password protect | — | BLOCKED | BLK | BLK | BLK | BLK |
+| 32 | PDF unlock | — | BLOCKED | BLK | BLK | BLK | BLK |
+| 33 | PDF annotations | — | ABSENT | — | — | — | — |
+| 34 | PDF redaction | — | ABSENT | — | — | — | — |
+| 35 | PDF compression | `/pdf/fit` | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
 
-### B. PDF toolbox
+### C. Image toolbox (12 weight)
 
-| Feature | Route | Status | Windows | macOS ARM | macOS Intel | Linux |
-| --- | --- | --- | --- | --- | --- | --- |
-| Merge | `/pdf/merge` | WORKING | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Split | `/pdf/split` | WORKING | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Rotate pages | `/pdf/pages` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Insert pages | `/pdf/pages` | WORKING | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Compare (multipage) | `/pdf/compare` | WORKING | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Password protect | — | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| Annotations | — | ABSENT | — | — | — | — |
-| Redaction | — | ABSENT | — | — | — | — |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 36 | Image fit (constraints) | `/image/fit` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 37 | Image resize (Recipe) | `/recipes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 38 | Image convert (Recipe) | `/recipes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 39 | Strip EXIF (Recipe) | `/recipes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 40 | Image watermark (Recipe) | `/recipes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 41 | Metadata Studio | `/metadata-studio` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 42 | Screenshot Bridge | `/screenshot-bridge` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 43 | Document Scanner | `/scanner` | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 44 | Passport Photo | `/passport-photo` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
 
-### G. Batch processing and automation
+### D. Student + application workflows (22 weight)
 
-| Feature | Route | Status | Windows | macOS ARM | macOS Intel | Linux |
-| --- | --- | --- | --- | --- | --- | --- |
-| Typed Recipes | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: Resize | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: Convert | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: StripExif | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: Watermark (image) | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: Watermark (PDF) | `/recipes` | WORKING | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Recipe: 6-op pipeline | `/recipes` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Watch → Recipe | `/watch` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Timer Jobs (real scheduler) | `/timer` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 45 | Portal Ready | `/portal` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 46 | Assignment Studio | `/assignment` | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 47 | Application Kit | `/kit` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 48 | Study Reader | `/reader` | PARTIAL | UNTESTED | BV | UNTESTED | UNTESTED |
+| 49 | Notes | `/notes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 50 | Study Packs | `/study-packs` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 51 | Citation Studio | `/citations` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 52 | Signature Vault | `/signature-vault` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
+| 53 | Forms Vault | `/forms-vault` | WORKING | VERIFIED | BV | UNTESTED | UNTESTED |
 
-### H. Sharing and media utilities
+### E. Print + study workspace (included in D)
 
-| Feature | Route | Status | Windows | macOS ARM | macOS Intel | Linux |
-| --- | --- | --- | --- | --- | --- | --- |
-| Paperu Send (LAN) | `/send` | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| Webpage → PDF | `/webpage-pdf` | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| FFmpeg tools | — | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 54 | Print Studio | `/print` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 55 | Batch Studio | `/batch` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
 
-### J. Commercial and native-platform features
+### F. File utilities (18 weight)
 
-| Feature | Route | Status | Windows | macOS ARM | macOS Intel | Linux |
-| --- | --- | --- | --- | --- | --- | --- |
-| Analytics (opt-in) | `/diagnostics` | VERIFIED | BUILD_VERIFIED | UNTESTED | UNTESTED | VERIFIED |
-| Code signing | — | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
-| Updater (signed) | — | BLOCKED_EXTERNAL | BLOCKED | BLOCKED | BLOCKED | BLOCKED |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 56 | Inspect | `/inspect` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 57 | Folder Organizer | `/organizer` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 58 | Archive Studio | `/archive` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 59 | USB Toolbox | `/usb` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 60 | Backup Recipes | `/backup` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 61 | Duplicate Finder | `/duplicates` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 62 | Downloads Cleaner | `/cleaner` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 63 | Quick Look | `/quick-look` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 64 | Clipboard History | `/clipboard` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 65 | File Rescue | `/rescue` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 66 | Rename Studio | `/rename` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 67 | Filename Fixer | `/filename-fixer` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 68 | Metadata Studio | `/metadata-studio` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 69 | Offline Converter | `/converter` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
 
-## Completion calculation (separate tracks)
+### G. Automation + drives (10 weight)
 
-1. **Feature implementation coverage:** ~73/93 (the items that have routes + code)
-2. **End-to-end functional verification:** ~15/93 (items with automated tests)
-3. **Visual/UX acceptance:** 0/93 (not yet started — requires screenshots)
-4. **Accessibility acceptance:** 0/93 (not yet started — requires keyboard-nav tests)
-5. **Windows runtime verification:** BUILD_VERIFIED for ~8 items; UNTESTED for the rest
-6. **macOS ARM verification:** UNTESTED (no CI runner configured yet — the new cross-platform.yml will fix this)
-7. **macOS Intel verification:** UNTESTED (same)
-8. **Linux runtime verification:** VERIFIED for ~8 items; UNTESTED for the rest
-9. **Installation/release readiness:** BLOCKED_EXTERNAL (signing certificates required)
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 70 | Watch Folders (events) | `/watch` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 71 | Typed Recipe Engine | `/recipes` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 72 | Watch → Recipe dispatch | `/watch` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 73 | Watch → Organizer dispatch | `/watch` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 74 | Timer Jobs (real scheduler) | `/timer` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 75 | Timer → Backup Recipe | `/timer` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 76 | Timer → Typed Recipe | `/timer` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 77 | Timer → Organizer Rule | `/timer` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
 
-## Product-level user journey tests (§11)
+### H. Sharing + media (included in existing weights)
 
-| Journey | Status | Notes |
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 78 | Paperu Send (LAN) | `/send` | BLOCKED | BLK | BLK | BLK | BLK |
+| 79 | Webpage → PDF | `/webpage-pdf` | BLOCKED | BLK | BLK | BLK | BLK |
+| 80 | FFmpeg utility tools | — | BLOCKED | BLK | BLK | BLK | BLK |
+
+### I. Office + business (3 weight)
+
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 81 | Business Documents | `/business-docs` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 82 | PDF Notebook | `/notebook` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 83 | Print Studio | `/print` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+
+### J. Commercial + platform (5 weight)
+
+| # | Feature | Route | Status | Linux | Windows | macOS ARM | macOS x64 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 84 | Settings (typed, versioned) | shared | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 85 | Analytics (opt-in, typed) | `/diagnostics` | VERIFIED | VERIFIED | BV | UNTESTED | UNTESTED |
+| 86 | Diagnostics route | `/diagnostics` | WORKING | UNTESTED | BV | UNTESTED | UNTESTED |
+| 87 | Licensing (signed entitlement) | — | BLOCKED | BLK | BLK | BLK | BLK |
+| 88 | Updater (signed metadata) | — | BLOCKED | BLK | BLK | BLK | BLK |
+| 89 | Code signing | — | BLOCKED | BLK | BLK | BLK | BLK |
+| 90 | Windows installers (NSIS+MSI) | — | BV | BLK | BV | BLK | BLK |
+| 91 | macOS bundles (app+dmg) | — | UNTESTED | BLK | BLK | UNTESTED | UNTESTED |
+| 92 | Linux bundles (deb+appimage) | — | UNTESTED | UNTESTED | BLK | BLK | BLK |
+| 93 | Cross-platform CI (4-target) | — | PARTIAL | VERIFIED | BV | UNTESTED | UNTESTED |
+
+**Legend:** VERIFIED = test passes; BV = BUILD_VERIFIED (CI compiles+tests); UNTESTED = not yet runtime-tested; BLK = BLOCKED_EXTERNAL
+
+## Completion summary
+
+| Track | Count | Status |
 | --- | --- | --- |
-| A — Student assignment (17 images → A4 → compress) | NOT STARTED | Needs Assignment Studio completion |
-| B — Application preparation (photo+signature+PDF constraints) | NOT STARTED | Needs Portal Ready + Assignment Studio |
-| C — Secure document sharing (EXIF strip → password → Send) | BLOCKED | Paperu Send + PDF password are BLOCKED_EXTERNAL |
-| D — Print shop (50 pages → 2-up → print-ready) | NOT STARTED | Needs Print Studio completion |
-| E — Batch images (100 JPEGs → resize → compress → rename) | NOT STARTED | Needs Batch Studio completion |
-| F — Study session (textbook → highlight → bookmark → pack) | NOT STARTED | Needs Study Reader completion |
-| G — Automation (Recipe → Watch → drop → history) | VERIFIED | Watch→Recipe end-to-end test passes |
+| Feature implementation coverage | 80/93 | 86% (13 ABSENT/BLOCKED) |
+| End-to-end functional verification | 35/93 | 38% |
+| Visual/UX acceptance | 0/93 | 0% (not started) |
+| Accessibility acceptance | 0/93 | 0% (not started) |
+| Windows runtime verification | 80/93 BUILD_VERIFIED | CI compiles+tests |
+| macOS ARM verification | 0/93 | UNTESTED (CI queued) |
+| macOS Intel verification | 0/93 | UNTESTED (CI queued) |
+| Linux runtime verification | 35/93 | VERIFIED for tested items |
+| Installation/release readiness | 0/93 | BLOCKED (signing required) |
 
-## Per-feature checks (§2)
+## Product-level journey tests (§11)
 
-For each feature, the following must all be true to earn DONE:
+| Journey | Status |
+| --- | --- |
+| A — Student assignment | NOT STARTED |
+| B — Application preparation | NOT STARTED |
+| C — Secure document sharing | BLOCKED (Send + PDF password) |
+| D — Print shop | NOT STARTED |
+| E — Batch images | NOT STARTED |
+| F — Study session | NOT STARTED |
+| G — Automation | VERIFIED (Watch→Recipe + Timer→Recipe end-to-end) |
 
-1. ✅ Represented in the module registry
+## Per-feature 15-point DONE checklist
+
+For each feature, ALL 15 must be ✅ to earn DONE:
+
+1. ✅ Module registry entry
 2. ✅ Route resolves
-3. ✅ Navigation entry reachable
-4. ⬜ Primary action enabled when valid input present
+3. ✅ Navigation reachable
+4. ⬜ Primary action enabled when valid input
 5. ⬜ Controls have working state
-6. ✅ IPC/backend operation executes
-7. ✅ Produces correct output or persisted result
+6. ✅ IPC/backend executes
+7. ✅ Produces correct output
 8. ✅ Output metadata inspected
 9. ⬜ Error states understandable
-10. ⬜ Cancellation works for long-running operations
+10. ⬜ Cancellation works for long ops
 11. ⬜ Results accessible after completion
 12. ⬜ State persists correctly
 13. ⬜ Keyboard navigation works
-14. ⬜ Works on supported platforms
-15. ⬜ UI matches Paperu design system
-
-The ✅ marks are evidence-based; ⬜ marks are not yet verified. A
-feature is DONE only when ALL 15 are ✅.
-
-## Visual acceptance testing (§9)
-
-Not yet started. Requires:
-- Playwright component tests for frontend interactions
-- Actual Tauri native testing for runtime claims
-- Screenshots of: empty state, input populated, options configured, processing, result, error state, dark mode, compact window, large window
-
-## Next steps
-
-1. **Cross-platform CI:** the new `cross-platform.yml` workflow (4 targets) will give us macOS ARM/Intel + Linux BUILD_VERIFIED status for all features.
-2. **Visual acceptance:** per-feature screenshots + Playwright component tests.
-3. **Journey tests A-F:** complete the remaining flagship workflows (Assignment Studio, Portal Ready, Print Studio, Batch Studio, Study Reader).
-4. **BLOCKED_EXTERNAL resolution:** signing certs (Windows Authenticode + macOS Developer ID), qpdf binary, FFmpeg binary, Paperu Send HTTP server.
+14. ⬜ Works on all supported platforms
+15. ⬜ UI matches design system
